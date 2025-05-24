@@ -270,10 +270,10 @@ class DailyTaskScheduler:
     def manual_execution(self, target_date: Optional[datetime] = None) -> bool:
         """Manually execute tasks for a specific date (for testing/debugging)"""
         if target_date is None:
-            target_date = datetime.now() - timedelta(days=1)
+            target_date = datetime.now()
         
         logger.info(f"Manual execution for {target_date.strftime('%Y-%m-%d')}")
-        return self.execute_daily_tasks()
+        return self.execute_daily_tasks(target_date)
 
 
 # Global scheduler instance

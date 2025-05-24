@@ -15,8 +15,8 @@ class ExcelReader:
     def read_training_plan(self) -> Optional[pd.DataFrame]:
         """Read the training plan from Excel file"""
         try:
-            # Read Excel file
-            df = pd.read_excel(self.file_path)
+            # Read Excel file with explicit engine
+            df = pd.read_excel(self.file_path, engine='openpyxl')
             
             # Validate required columns
             required_columns = [
@@ -131,7 +131,7 @@ class ExcelReader:
         
         try:
             # Check if file exists
-            df = pd.read_excel(self.file_path)
+            df = pd.read_excel(self.file_path, engine='openpyxl')
             validation_results['file_exists'] = True
             
             # Check required columns

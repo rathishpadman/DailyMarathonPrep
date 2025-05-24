@@ -180,6 +180,7 @@ def strava_auth():
     try:
         strava_client = StravaClient()
         auth_url = strava_client.get_authorization_url()
+        logger.info(f"Generated Strava auth URL: {auth_url}")
         return redirect(auth_url)
         
     except Exception as e:

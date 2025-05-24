@@ -104,12 +104,16 @@ class StravaClient:
     
     def get_authorization_url(self) -> str:
         """Get Strava OAuth authorization URL"""
+        from urllib.parse import quote
+        
         scopes = "read,activity:read_all"
+        redirect_uri = quote(Config.STRAVA_REDIRECT_URI, safe='')
+        
         auth_url = (
             f"https://www.strava.com/oauth/authorize"
             f"?client_id={self.client_id}"
             f"&response_type=code"
-            f"&redirect_uri={Config.STRAVA_REDIRECT_URI}"
+            f"&redirect_uri={redirect_uri}"
             f"&approval_prompt=force"
             f"&scope={scopes}"
         )

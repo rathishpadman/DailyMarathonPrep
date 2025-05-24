@@ -1,0 +1,58 @@
+I want to build a "Daily Automated Marathon Preparation Dashboard" application, primarily using Python.
+
+**Project Goal:**
+Create a system that runs daily to track the marathon training progress of a small group of 3-4 athletes. It should benchmark their actual Strava performance against a day-wise training plan provided in an Excel file and distribute a summary dashboard.
+
+**Core Requirements & Features:**
+
+1.  **Strava Data Integration:**
+    * Fetch daily activity data from the Strava API for each athlete (specifically 'Run' type activities including distance, moving time, pace, and date).
+    * Assume athletes have granted OAuth permissions and their `refresh_tokens` are securely available (e.g., via environment variables). Do keep app registration option for the first time user
+    * The system should handle Strava token refresh using these `refresh_tokens`.
+
+2.  **Excel Training Plan Integration:**
+    * Read a predefined daily training plan from an Excel file (e.g., `training_plan.xlsx`).
+    * The Excel file will have columns like: `Date` (YYYY-MM-DD), `AthleteName`, `PlannedDistanceKM`, `PlannedPaceMinPerKM` (e.g., 5.5 for 5:30 min/km), `WorkoutType`, and `Notes`.
+
+3.  **Data Processing & Benchmarking:**
+    * For each athlete, match their Strava activities from the *previous day* to the planned workout for that day.
+    * If multiple runs occurred, aggregate them (e.g., sum distance, calculate overall pace).
+    * Calculate key performance metrics: `ActualDistanceKM`, `ActualPaceMinPerKM`, `DistanceVariancePercent`, `PaceVariancePercent` (planned vs. actual).
+    * Determine a `Status` for the workout (e.g., "On Track", "Under-performed", "Over-performed", "Missed Workout", "Extra Activity").
+    * Aggregate daily team summaries (e.g., number of athletes who completed workouts).
+
+4.  **Dashboard Generation:**
+    * Generate a daily human-readable dashboard. This can be a rich Markdown string or a simple HTML file.
+    * The dashboard must include:
+        * An overall team summary for the previous day.
+        * An individual performance table for each athlete for the previous day.
+        * A section displaying the planned workouts for all athletes for the *current day*.
+
+5.  **WhatsApp Notification:**
+    * Send a *concise summary* of the daily dashboard to a specified WhatsApp group.
+    * For this, provide a placeholder function to interact with the WhatsApp Business API (assuming API URL, token, and group ID are available). Include a note about the complexities/limitations of unofficial WhatsApp automation.
+
+6.  **Scheduling & Execution:**
+    * The entire process (fetch, process, generate, send) must be designed to run automatically once per day. The main script should be the entry point for a scheduler (e.g., cron, PythonAnywhere scheduled task, Replit scheduled deployment).
+
+7.  **Configuration & Security:**
+    * All sensitive data (Strava client ID/secret, athlete refresh tokens, WhatsApp credentials) and configurable paths (Excel file) must be managed via environment variables.
+
+**Technical Stack & Structure (for Python):**
+
+* **Language:** Python 3.8+
+* **Key Libraries (Suggestions):** `stravalib` or `requests` for Strava, `pandas` for Excel, `python-dotenv` for environment variables.
+* **Modularity:** Design the application with a clear, modular Python file structure. For example:
+    * `main.py`: Orchestrator script for the daily task.
+    * `config.py`: Handles loading of environment variables.
+    * `strava_client.py`: Functions for Strava API interaction and token management.
+    * `excel_reader.py`: Functions for loading and parsing the training plan.
+    * `data_processor.py`: Logic for benchmarking, variance calculation, and status determination.
+    * `dashboard_builder.py`: Functions to generate the Markdown/HTML dashboard content.
+    * `notifier.py`: Function(s) for sending WhatsApp messages.
+* **Error Handling:** Implement basic `try-except` blocks for API calls and file operations.
+* **Logging:** Include simple logging (e.g., using the `logging` module) to track execution status and errors.
+
+**Requested Output:**
+
+Please provide the foundational Python code structure for this application, including function signatures, class definitions (if appropriate), and comments indicating where specific logic needs to be implemented. Focus on the interactions between modules and the overall data flow. If generating for a visual app builder like Bubble, describe the necessary data types, database structure, workflows, and potential UI page layouts to achieve this functionality.

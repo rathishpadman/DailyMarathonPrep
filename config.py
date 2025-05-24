@@ -10,7 +10,7 @@ class Config:
     # Strava API Configuration
     STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
     STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
-    STRAVA_REDIRECT_URI = os.getenv("STRAVA_REDIRECT_URI", "http://localhost:5000/auth/strava/callback")
+    STRAVA_REDIRECT_URI = os.getenv("STRAVA_REDIRECT_URI", "https://workspace.replit.app/auth/strava/callback")
     
     # WhatsApp Business API Configuration
     WHATSAPP_API_URL = os.getenv("WHATSAPP_API_URL")

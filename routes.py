@@ -144,6 +144,52 @@ def training_plan():
         flash(f"Error loading training plan: {e}", "error")
         return redirect(url_for('index'))
 
+@app.route('/upload-training-plan', methods=['POST'])
+def upload_training_plan():
+    """Handle training plan file upload"""
+    try:
+        if 'training_file' not in request.files:
+            flash('No file selected', 'error')
+            return redirect(url_for('training_plan'))
+        
+        file = request.files['training_file']
+        if file.filename == '':
+            flash('No file selected', 'error')
+            return redirect(url_for('training_plan'))
+        
+        if file and file.filename.lower().endswith(('.xlsx', '.xls')):
+            # Save the uploaded file
+            filename = 'uploaded_training_plan.xlsx'
+            file_path = os.path.join(os.getcwd(), filename)
+            file.save(file_path)
+            
+            # Update config to use the uploaded file
+            Config.TRAINING_PLAN_FILE = filename
+            
+            # Validate the uploaded file
+            excel_reader = ExcelReader(file_path)
+            validation_results = excel_reader.validate_excel_format()
+            
+            if validation_results.get('file_exists', False) and validation_results.get('required_columns', False):
+                # Trigger manual task to process the new file
+                from scheduler import run_manual_task
+                success = run_manual_task()
+                
+                if success:
+                    flash('Training plan uploaded and processed successfully!', 'success')
+                else:
+                    flash('Training plan uploaded but processing had some issues. Check the logs for details.', 'warning')
+            else:
+                flash('Uploaded file format is invalid. Please check the required columns and data format.', 'error')
+        else:
+            flash('Please upload a valid Excel file (.xlsx or .xls)', 'error')
+            
+    except Exception as e:
+        logger.error(f"Error uploading training plan: {e}")
+        flash(f'Error uploading file: {e}', 'error')
+    
+    return redirect(url_for('training_plan'))
+
 @app.route('/api/manual-run', methods=['POST'])
 def manual_run():
     """API endpoint to manually trigger daily tasks"""

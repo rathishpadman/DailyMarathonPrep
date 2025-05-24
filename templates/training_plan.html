@@ -320,36 +320,34 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-info">
-                    <i data-feather="info" class="me-2"></i>
-                    <strong>Note:</strong> File upload functionality requires server-side implementation.
-                    For now, please manually place your Excel file in the application directory as 
-                    <code>{{ training_plan_file }}</code>.
-                </div>
-                
-                <h6>Required File Format:</h6>
-                <ul class="small">
-                    <li>Excel file (.xlsx or .xls)</li>
-                    <li>Must contain all required columns</li>
-                    <li>Date format: YYYY-MM-DD</li>
-                    <li>Numeric values for distance and pace</li>
-                </ul>
-                
-                <h6 class="mt-3">Steps to Upload:</h6>
-                <ol class="small">
-                    <li>Prepare your Excel file with the correct format</li>
-                    <li>Save it as <code>{{ training_plan_file }}</code></li>
-                    <li>Place it in the application root directory</li>
-                    <li>Run manual sync to load the data</li>
-                </ol>
+                <form id="uploadForm" action="{{ url_for('upload_training_plan') }}" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="training_file" class="form-label">Select Excel Training Plan</label>
+                        <input type="file" class="form-control" id="training_file" name="training_file" accept=".xlsx,.xls" required>
+                        <div class="form-text">Choose an Excel file (.xlsx or .xls) with your training plan</div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i data-feather="info" class="me-2"></i>
+                        <strong>Required Format:</strong> Your Excel file must include these columns:
+                        <ul class="mt-2 mb-0 small">
+                            <li><strong>Date:</strong> Use your system date format (YYYY-MM-DD recommended)</li>
+                            <li><strong>AthleteName:</strong> Full name of the athlete</li>
+                            <li><strong>PlannedDistanceKM:</strong> Distance in kilometers (e.g., 10.5)</li>
+                            <li><strong>PlannedPaceMinPerKM:</strong> Pace in minutes per km (e.g., 5.5 for 5:30 min/km)</li>
+                            <li><strong>WorkoutType:</strong> Type of workout (optional)</li>
+                            <li><strong>Notes:</strong> Additional notes (optional)</li>
+                        </ul>
+                    </div>
+                </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                     Close
                 </button>
-                <button type="button" class="btn btn-primary" onclick="runManualTask()">
-                    <i data-feather="refresh-cw" class="me-2"></i>
-                    Sync Training Plan
+                <button type="submit" form="uploadForm" class="btn btn-primary">
+                    <i data-feather="upload" class="me-2"></i>
+                    Upload Training Plan
                 </button>
             </div>
         </div>

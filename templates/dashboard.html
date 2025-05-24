@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Marathon Training{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Dashboard Header -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <h1 class="display-5">
+                <i data-feather="bar-chart-2" class="me-3"></i>
+                Training Dashboard
+            </h1>
+            <p class="lead">
+                Performance analysis for {{ target_date.strftime('%A, %B %d, %Y') }}
+            </p>
+        </div>
+        <div class="col-lg-4 text-lg-end">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i data-feather="calendar"></i>
+                </span>
+                <input type="date" class="form-control" id="dateSelector" 
+                       value="{{ target_date.strftime('%Y-%m-%d') }}"
+                       onchange="changeDashboardDate(this.value)">
+            </div>
+        </div>
+    </div>
+
+    {% if dashboard_data %}
+    <!-- Team Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <i data-feather="users" class="mb-2" style="width: 2.5rem; height: 2.5rem;"></i>
+                    <h3 class="card-title">{{ dashboard_data.team_summary.total_athletes or 0 }}</h3>
+                    <p class="card-text">Total Athletes</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <i data-feather="check-circle" class="mb-2" style="width: 2.5rem; height: 2.5rem;"></i>
+                    <h3 class="card-title">{{ dashboard_data.team_summary.completed_workouts or 0 }}</h3>
+                    <p class="card-text">Completed Workouts</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <i data-feather="target" class="mb-2" style="width: 2.5rem; height: 2.5rem;"></i>
+                    <h3 class="card-title">{{ dashboard_data.team_summary.completion_rate or 0 }}%</h3>
+                    <p class="card-text">Completion Rate</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <i data-feather="trending-up" class="mb-2" style="width: 2.5rem; height: 2.5rem;"></i>
+                    <h3 class="card-title">{{ "%+.1f"|format(dashboard_data.team_summary.average_distance_variance or 0) }}%</h3>
+                    <p class="card-text">Avg Distance Variance</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Performance Chart -->
+    <div class="row mb-4">
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="trending-up" class="me-2"></i>
+                        Weekly Completion Trends
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="weeklyTrendsChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="pie-chart" class="me-2"></i>
+                        Status Breakdown
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="statusBreakdownChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Individual Performance Table -->
+    {% if dashboard_data.athlete_summaries %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="users" class="me-2"></i>
+                        Individual Performance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Athlete</th>
+                                    <th>Status</th>
+                                    <th>Planned Distance</th>
+                                    <th>Actual Distance</th>
+                                    <th>Distance Variance</th>
+                                    <th>Planned Pace</th>
+                                    <th>Actual Pace</th>
+                                    <th>Pace Variance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for summary in dashboard_data.athlete_summaries %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ summary.athlete_name }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if summary.status == 'On Track' %}
+                                            <span class="badge bg-success">{{ summary.status }}</span>
+                                        {% elif summary.status == 'Over-performed' %}
+                                            <span class="badge bg-info">{{ summary.status }}</span>
+                                        {% elif summary.status == 'Under-performed' %}
+                                            <span class="badge bg-warning">{{ summary.status }}</span>
+                                        {% elif summary.status == 'Missed Workout' %}
+                                            <span class="badge bg-danger">{{ summary.status }}</span>
+                                        {% elif summary.status == 'Extra Activity' %}
+                                            <span class="badge bg-primary">{{ summary.status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ summary.status or 'Unknown' }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ summary.planned_distance }}</td>
+                                    <td>{{ summary.actual_distance }}</td>
+                                    <td>
+                                        <span class="{% if '+' in summary.distance_variance and summary.distance_variance != '+0.0%' %}text-info{% elif '-' in summary.distance_variance and summary.distance_variance != '+0.0%' %}text-warning{% else %}text-success{% endif %}">
+                                            {{ summary.distance_variance }}
+                                        </span>
+                                    </td>
+                                    <td>{{ summary.planned_pace }}</td>
+                                    <td>{{ summary.actual_pace }}</td>
+                                    <td>
+                                        <span class="{% if '+' in summary.pace_variance and summary.pace_variance != '+0.0%' %}text-warning{% elif '-' in summary.pace_variance and summary.pace_variance != '+0.0%' %}text-info{% else %}text-success{% endif %}">
+                                            {{ summary.pace_variance }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Today's Planned Workouts -->
+    {% if dashboard_data.todays_workouts %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="calendar" class="me-2"></i>
+                        Today's Planned Workouts
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Athlete</th>
+                                    <th>Planned Distance</th>
+                                    <th>Target Pace</th>
+                                    <th>Workout Type</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for workout in dashboard_data.todays_workouts %}
+                                <tr>
+                                    <td><strong>{{ workout.athlete_name }}</strong></td>
+                                    <td>{{ workout.planned_distance }}</td>
+                                    <td>{{ workout.planned_pace }}</td>
+                                    <td>
+                                        <span class="badge bg-outline-primary">{{ workout.workout_type }}</span>
+                                    </td>
+                                    <td>
+                                        {% if workout.notes %}
+                                            <small class="text-muted">{{ workout.notes[:100] }}{% if workout.notes|length > 100 %}...{% endif %}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- No Data Available -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i data-feather="alert-circle" class="text-muted mb-3" style="width: 4rem; height: 4rem;"></i>
+                    <h4 class="text-muted mb-3">No Data Available</h4>
+                    <p class="text-muted mb-4">
+                        No dashboard data found for {{ target_date.strftime('%Y-%m-%d') }}.<br>
+                        This could be because:
+                    </p>
+                    <ul class="list-unstyled text-muted">
+                        <li><i data-feather="minus" class="me-2"></i>No Strava activities were recorded</li>
+                        <li><i data-feather="minus" class="me-2"></i>Athletes haven't connected their Strava accounts</li>
+                        <li><i data-feather="minus" class="me-2"></i>Training plan is not uploaded</li>
+                        <li><i data-feather="minus" class="me-2"></i>Daily sync hasn't run yet</li>
+                    </ul>
+                    <div class="mt-4">
+                        <button class="btn btn-primary me-2" onclick="runManualTask()">
+                            <i data-feather="refresh-cw" class="me-2"></i>
+                            Run Manual Sync
+                        </button>
+                        <a href="{{ url_for('athletes') }}" class="btn btn-outline-secondary">
+                            <i data-feather="users" class="me-2"></i>
+                            Manage Athletes
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    function changeDashboardDate(newDate) {
+        window.location.href = "{{ url_for('dashboard') }}/" + newDate;
+    }
+
+    // Initialize charts if data is available
+    {% if dashboard_data and weekly_trends %}
+    document.addEventListener('DOMContentLoaded', function() {
+        // Weekly Trends Chart
+        const weeklyCtx = document.getElementById('weeklyTrendsChart').getContext('2d');
+        new Chart(weeklyCtx, {
+            type: 'line',
+            data: {
+                labels: {{ weekly_trends.weeks | tojson }},
+                datasets: [{
+                    label: 'Completion Rate (%)',
+                    data: {{ weekly_trends.completion_rates | tojson }},
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.4
+                }, {
+                    label: 'Total Distance (km)',
+                    data: {{ weekly_trends.total_distances | tojson }},
+                    borderColor: 'rgb(255, 99, 132)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    tension: 0.4,
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Completion Rate (%)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Distance (km)'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    }
+                }
+            }
+        });
+
+        // Status Breakdown Chart
+        {% if dashboard_data.team_summary.status_breakdown %}
+        const statusCtx = document.getElementById('statusBreakdownChart').getContext('2d');
+        const statusData = {{ dashboard_data.team_summary.status_breakdown | tojson }};
+        
+        new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(statusData),
+                datasets: [{
+                    data: Object.values(statusData),
+                    backgroundColor: [
+                        '#28a745', // On Track - green
+                        '#17a2b8', // Over-performed - info
+                        '#ffc107', // Under-performed - warning
+                        '#dc3545', // Missed Workout - danger
+                        '#007bff', // Extra Activity - primary
+                        '#6c757d'  // Other - secondary
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+        {% endif %}
+
+        feather.replace();
+    });
+    {% endif %}
+</script>
+{% endblock %}

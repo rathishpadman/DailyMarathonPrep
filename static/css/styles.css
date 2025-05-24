@@ -1,0 +1,266 @@
+/* Custom CSS for Marathon Training Dashboard */
+
+:root {
+    /* Custom color variables following Bootstrap conventions */
+    --dashboard-primary: var(--bs-primary);
+    --dashboard-success: var(--bs-success);
+    --dashboard-info: var(--bs-info);
+    --dashboard-warning: var(--bs-warning);
+    --dashboard-danger: var(--bs-danger);
+    
+    /* Custom spacing */
+    --dashboard-spacing: 1rem;
+    --dashboard-card-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+/* Card enhancements */
+.card {
+    box-shadow: var(--dashboard-card-shadow);
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+/* Status badges customization */
+.badge.bg-outline-primary {
+    color: var(--bs-primary);
+    border: 1px solid var(--bs-primary);
+    background-color: transparent;
+}
+
+.badge.bg-outline-secondary {
+    color: var(--bs-secondary);
+    border: 1px solid var(--bs-secondary);
+    background-color: transparent;
+}
+
+/* Chart containers */
+.chart-container {
+    position: relative;
+    height: 400px;
+    width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .display-4, .display-5 {
+        font-size: 2rem;
+    }
+    
+    .lead {
+        font-size: 1rem;
+    }
+    
+    .chart-container {
+        height: 300px;
+    }
+}
+
+/* Table enhancements */
+.table-hover tbody tr:hover {
+    background-color: var(--bs-gray-100);
+}
+
+[data-bs-theme="dark"] .table-hover tbody tr:hover {
+    background-color: var(--bs-gray-800);
+}
+
+/* Alert improvements */
+.alert {
+    border: none;
+    border-left: 4px solid;
+}
+
+.alert-success {
+    border-left-color: var(--bs-success);
+}
+
+.alert-info {
+    border-left-color: var(--bs-info);
+}
+
+.alert-warning {
+    border-left-color: var(--bs-warning);
+}
+
+.alert-danger {
+    border-left-color: var(--bs-danger);
+}
+
+/* Navigation enhancements */
+.navbar-brand {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    transition: color 0.15s ease-in-out;
+}
+
+/* Button enhancements */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.15s ease-in-out;
+}
+
+.btn .spinner-border {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Loading states */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid var(--bs-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Footer styling */
+footer {
+    margin-top: auto;
+}
+
+/* Custom utility classes */
+.text-muted-light {
+    color: var(--bs-gray-600) !important;
+}
+
+[data-bs-theme="dark"] .text-muted-light {
+    color: var(--bs-gray-400) !important;
+}
+
+/* Icon enhancements */
+.feather {
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+}
+
+/* Form enhancements */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* Modal enhancements */
+.modal-header {
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--bs-border-color);
+}
+
+/* Dashboard specific enhancements */
+.dashboard-stat-card {
+    text-align: center;
+    padding: var(--dashboard-spacing);
+}
+
+.dashboard-stat-card h3 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.dashboard-stat-card p {
+    margin-bottom: 0;
+    opacity: 0.9;
+}
+
+/* Status indicators */
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-indicator .feather {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+/* Progress bars */
+.progress {
+    height: 0.75rem;
+}
+
+.progress-bar {
+    transition: width 0.6s ease;
+}
+
+/* Custom spacing utilities */
+.py-6 {
+    padding-top: 3rem !important;
+    padding-bottom: 3rem !important;
+}
+
+.my-6 {
+    margin-top: 3rem !important;
+    margin-bottom: 3rem !important;
+}
+
+/* Print styles */
+@media print {
+    .navbar,
+    .btn,
+    footer {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #000 !important;
+        box-shadow: none !important;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .card {
+        border: 2px solid var(--bs-border-color);
+    }
+    
+    .btn {
+        border-width: 2px;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .card,
+    .btn,
+    .nav-link,
+    .progress-bar {
+        transition: none;
+    }
+    
+    .loading::after {
+        animation: none;
+    }
+}

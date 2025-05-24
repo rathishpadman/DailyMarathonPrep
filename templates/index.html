@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Marathon Training Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Hero Section -->
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto text-center">
+            <h1 class="display-4 mb-4">
+                <i data-feather="activity" class="me-3"></i>
+                Marathon Training Dashboard
+            </h1>
+            <p class="lead mb-4">
+                Automated daily tracking and analysis of your team's marathon training progress.
+                Connect with Strava, upload your training plan, and get daily performance insights.
+            </p>
+        </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="row mb-5">
+        <div class="col-md-3 mb-3">
+            <div class="card bg-primary">
+                <div class="card-body text-center">
+                    <i data-feather="users" class="mb-2" style="width: 2rem; height: 2rem;"></i>
+                    <h3 class="card-title">{{ total_athletes }}</h3>
+                    <p class="card-text">Active Athletes</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-success">
+                <div class="card-body text-center">
+                    <i data-feather="activity" class="mb-2" style="width: 2rem; height: 2rem;"></i>
+                    <h3 class="card-title">{{ recent_activities }}</h3>
+                    <p class="card-text">Activities (7 days)</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-info">
+                <div class="card-body text-center">
+                    <i data-feather="trending-up" class="mb-2" style="width: 2rem; height: 2rem;"></i>
+                    <h3 class="card-title">
+                        {% if latest_log and latest_log.log_type == 'SUCCESS' %}
+                            <i data-feather="check-circle" style="color: #28a745; width: 1.5rem; height: 1.5rem;"></i>
+                        {% elif latest_log and latest_log.log_type == 'ERROR' %}
+                            <i data-feather="alert-circle" style="color: #dc3545; width: 1.5rem; height: 1.5rem;"></i>
+                        {% else %}
+                            <i data-feather="clock" style="color: #ffc107; width: 1.5rem; height: 1.5rem;"></i>
+                        {% endif %}
+                    </h3>
+                    <p class="card-text">System Status</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-warning">
+                <div class="card-body text-center">
+                    <i data-feather="calendar" class="mb-2" style="width: 2rem; height: 2rem;"></i>
+                    <h3 class="card-title">{{ recent_summaries|length }}</h3>
+                    <p class="card-text">Recent Reports</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Actions -->
+    <div class="row mb-5">
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="bar-chart-2" class="me-2"></i>
+                        Daily Dashboard
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        View comprehensive performance analytics, team summaries, and individual athlete progress.
+                    </p>
+                    <ul class="list-unstyled">
+                        <li><i data-feather="check" class="me-2 text-success"></i>Team performance overview</li>
+                        <li><i data-feather="check" class="me-2 text-success"></i>Individual athlete analysis</li>
+                        <li><i data-feather="check" class="me-2 text-success"></i>Weekly trend charts</li>
+                        <li><i data-feather="check" class="me-2 text-success"></i>Today's planned workouts</li>
+                    </ul>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+                        <i data-feather="bar-chart-2" class="me-2"></i>
+                        Open Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="settings" class="me-2"></i>
+                        Setup & Management
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Configure athletes, manage Strava connections, and upload training plans.
+                    </p>
+                    <ul class="list-unstyled">
+                        <li><i data-feather="user-plus" class="me-2 text-info"></i>Connect Strava accounts</li>
+                        <li><i data-feather="upload" class="me-2 text-info"></i>Upload training plans</li>
+                        <li><i data-feather="users" class="me-2 text-info"></i>Manage team members</li>
+                        <li><i data-feather="refresh-cw" class="me-2 text-info"></i>Manual data sync</li>
+                    </ul>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('athletes') }}" class="btn btn-outline-primary me-2">
+                        <i data-feather="users" class="me-2"></i>
+                        Athletes
+                    </a>
+                    <a href="{{ url_for('training_plan') }}" class="btn btn-outline-secondary">
+                        <i data-feather="calendar" class="me-2"></i>
+                        Training Plan
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    {% if recent_summaries %}
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="clock" class="me-2"></i>
+                        Recent Daily Summaries
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Athlete</th>
+                                    <th>Status</th>
+                                    <th>Distance</th>
+                                    <th>Pace</th>
+                                    <th>Distance Variance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for summary in recent_summaries %}
+                                <tr>
+                                    <td>{{ summary.summary_date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ summary.athlete.name }}</td>
+                                    <td>
+                                        {% if summary.status == 'On Track' %}
+                                            <span class="badge bg-success">{{ summary.status }}</span>
+                                        {% elif summary.status == 'Over-performed' %}
+                                            <span class="badge bg-info">{{ summary.status }}</span>
+                                        {% elif summary.status == 'Under-performed' %}
+                                            <span class="badge bg-warning">{{ summary.status }}</span>
+                                        {% elif summary.status == 'Missed Workout' %}
+                                            <span class="badge bg-danger">{{ summary.status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ summary.status or 'Unknown' }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if summary.actual_distance_km %}
+                                            {{ "%.1f"|format(summary.actual_distance_km) }} km
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if summary.actual_pace_min_per_km %}
+                                            {{ "%d:%02d"|format(summary.actual_pace_min_per_km|int, ((summary.actual_pace_min_per_km - summary.actual_pace_min_per_km|int) * 60)|int) }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if summary.distance_variance_percent is not none %}
+                                            <span class="{% if summary.distance_variance_percent > 10 %}text-info{% elif summary.distance_variance_percent < -10 %}text-warning{% else %}text-success{% endif %}">
+                                                {{ "%+.1f"|format(summary.distance_variance_percent) }}%
+                                            </span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
+                        View Full Dashboard
+                        <i data-feather="arrow-right" class="ms-2"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- System Status -->
+    {% if latest_log %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="info" class="me-2"></i>
+                        Latest System Update
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            {% if latest_log.log_type == 'SUCCESS' %}
+                                <i data-feather="check-circle" class="text-success" style="width: 2rem; height: 2rem;"></i>
+                            {% elif latest_log.log_type == 'ERROR' %}
+                                <i data-feather="alert-circle" class="text-danger" style="width: 2rem; height: 2rem;"></i>
+                            {% elif latest_log.log_type == 'WARNING' %}
+                                <i data-feather="alert-triangle" class="text-warning" style="width: 2rem; height: 2rem;"></i>
+                            {% else %}
+                                <i data-feather="info" class="text-info" style="width: 2rem; height: 2rem;"></i>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">{{ latest_log.message }}</h6>
+                            <small class="text-muted">
+                                {{ latest_log.log_date.strftime('%Y-%m-%d %H:%M:%S') }}
+                            </small>
+                            {% if latest_log.details %}
+                                <p class="mb-0 mt-2 small">{{ latest_log.details }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    // Initialize feather icons when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        feather.replace();
+    });
+</script>
+{% endblock %}

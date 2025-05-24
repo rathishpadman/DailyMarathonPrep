@@ -1,0 +1,52 @@
+This file would normally be a binary Excel file, but since we cannot generate binary files, here's the structure that should be created:
+
+Excel File Structure for sample_training_plan.xlsx:
+=====================================================
+
+Sheet: Training Plan
+
+Columns:
+A: Date (YYYY-MM-DD format)
+B: AthleteName 
+C: PlannedDistanceKM
+D: PlannedPaceMinPerKM
+E: WorkoutType
+F: Notes
+
+Sample Data Rows:
+-----------------
+Row 1 (Headers): Date | AthleteName | PlannedDistanceKM | PlannedPaceMinPerKM | WorkoutType | Notes
+
+Row 2: 2024-01-15 | John Doe | 10.0 | 5.5 | Easy Run | Morning run, focus on form
+Row 3: 2024-01-15 | Jane Smith | 8.0 | 4.8 | Tempo Run | 20min warm-up, 30min tempo, 10min cool-down
+Row 4: 2024-01-15 | Mike Johnson | 12.0 | 6.0 | Long Run | Weekend long run, hydration focus
+Row 5: 2024-01-15 | Sarah Wilson | 6.0 | 5.2 | Recovery Run | Easy pace recovery
+
+Row 6: 2024-01-16 | John Doe | 6.0 | 5.0 | Intervals | 5x1km @ 4:30 pace
+Row 7: 2024-01-16 | Jane Smith | 10.0 | 5.2 | Easy Run | Recovery from yesterday's tempo
+Row 8: 2024-01-16 | Mike Johnson | 8.0 | 5.5 | Easy Run | Active recovery
+Row 9: 2024-01-16 | Sarah Wilson | 0.0 | 0.0 | Rest Day | Complete rest
+
+Row 10: 2024-01-17 | John Doe | 8.0 | 5.3 | Easy Run | Mid-week maintenance
+Row 11: 2024-01-17 | Jane Smith | 12.0 | 5.8 | Long Run | Build endurance base
+Row 12: 2024-01-17 | Mike Johnson | 6.0 | 4.5 | Tempo Run | 3x10min @ threshold pace
+Row 13: 2024-01-17 | Sarah Wilson | 8.0 | 5.5 | Easy Run | Steady comfortable pace
+
+Instructions to create this file:
+1. Open Microsoft Excel or Google Sheets
+2. Create a new spreadsheet
+3. Enter the column headers in row 1
+4. Enter the sample data as shown above
+5. Format the Date column as Date format (YYYY-MM-DD)
+6. Format PlannedDistanceKM and PlannedPaceMinPerKM as Number format with 1 decimal place
+7. Save as Excel file (.xlsx) with filename "sample_training_plan.xlsx"
+
+This sample provides training plans for 4 athletes over 3 days with different workout types:
+- Easy Run: Base aerobic training
+- Tempo Run: Lactate threshold training  
+- Intervals: Speed/VO2 max training
+- Long Run: Endurance building
+- Recovery Run: Active recovery
+- Rest Day: Complete rest
+
+The pace values are in minutes per kilometer (e.g., 5.5 = 5:30 min/km pace).

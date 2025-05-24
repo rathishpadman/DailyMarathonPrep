@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Athletes - Marathon Training Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <h1 class="display-5">
+                <i data-feather="users" class="me-3"></i>
+                Athletes Management
+            </h1>
+            <p class="lead">
+                Manage team members and their Strava connections
+            </p>
+        </div>
+        <div class="col-lg-4 text-lg-end">
+            <a href="{{ url_for('strava_auth') }}" class="btn btn-primary">
+                <i data-feather="plus" class="me-2"></i>
+                Connect Strava Account
+            </a>
+        </div>
+    </div>
+
+    <!-- Athletes Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <i data-feather="users" class="mb-2" style="width: 2.5rem; height: 2.5rem;"></i>
+                    <h3 class="card-title">{{ athlete_stats|length }}</h3>
+                    <p class="card-text">Total Athletes</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <i data-feather="check-circle" class="mb-2" style="width: 2.5rem; height: 2.5rem;"></i>
+                    <h3 class="card-title">{{ athlete_stats|selectattr('athlete.is_active')|list|length }}</h3>
+                    <p class="card-text">Active Athletes</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <i data-feather="activity" class="mb-2" style="width: 2.5rem; height: 2.5rem;"></i>
+                    <h3 class="card-title">{{ athlete_stats|sum(attribute='recent_activities') }}</h3>
+                    <p class="card-text">Recent Activities (7 days)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strava Connection Guide -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <div class="d-flex align-items-center">
+                    <i data-feather="info" class="me-3" style="width: 1.5rem; height: 1.5rem;"></i>
+                    <div>
+                        <h6 class="alert-heading mb-1">Strava Connection Required</h6>
+                        <p class="mb-0">
+                            Athletes need to connect their Strava accounts to enable automatic activity tracking.
+                            Click "Connect Strava Account" to start the OAuth flow.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Athletes Table -->
+    {% if athlete_stats %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="users" class="me-2"></i>
+                        Team Members
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Athlete</th>
+                                    <th>Status</th>
+                                    <th>Strava Connection</th>
+                                    <th>Total Activities</th>
+                                    <th>Recent Activities</th>
+                                    <th>Latest Performance</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in athlete_stats %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-3">
+                                                {% if stat.athlete.is_active %}
+                                                    <i data-feather="user" class="text-success"></i>
+                                                {% else %}
+                                                    <i data-feather="user-x" class="text-muted"></i>
+                                                {% endif %}
+                                            </div>
+                                            <div>
+                                                <strong>{{ stat.athlete.name }}</strong>
+                                                {% if stat.athlete.strava_athlete_id %}
+                                                    <br><small class="text-muted">Strava ID: {{ stat.athlete.strava_athlete_id }}</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if stat.athlete.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if stat.athlete.refresh_token %}
+                                            <div class="d-flex align-items-center">
+                                                <i data-feather="check-circle" class="text-success me-2"></i>
+                                                <div>
+                                                    <span class="text-success">Connected</span>
+                                                    {% if stat.athlete.token_expires_at %}
+                                                        <br><small class="text-muted">
+                                                            Expires: {{ stat.athlete.token_expires_at.strftime('%Y-%m-%d') }}
+                                                        </small>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="d-flex align-items-center">
+                                                <i data-feather="x-circle" class="text-danger me-2"></i>
+                                                <span class="text-danger">Not Connected</span>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-outline-primary">{{ stat.total_activities }}</span>
+                                    </td>
+                                    <td>
+                                        {% if stat.recent_activities > 0 %}
+                                            <span class="badge bg-success">{{ stat.recent_activities }}</span>
+                                        {% else %}
+                                            <span class="badge bg-outline-secondary">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if stat.latest_summary %}
+                                            <div>
+                                                {% if stat.latest_summary.status == 'On Track' %}
+                                                    <span class="badge bg-success">{{ stat.latest_summary.status }}</span>
+                                                {% elif stat.latest_summary.status == 'Over-performed' %}
+                                                    <span class="badge bg-info">{{ stat.latest_summary.status }}</span>
+                                                {% elif stat.latest_summary.status == 'Under-performed' %}
+                                                    <span class="badge bg-warning">{{ stat.latest_summary.status }}</span>
+                                                {% elif stat.latest_summary.status == 'Missed Workout' %}
+                                                    <span class="badge bg-danger">{{ stat.latest_summary.status }}</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">{{ stat.latest_summary.status or 'Unknown' }}</span>
+                                                {% endif %}
+                                                <br><small class="text-muted">
+                                                    {{ stat.latest_summary.summary_date.strftime('%Y-%m-%d') }}
+                                                </small>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">No data</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-secondary" 
+                                                    onclick="toggleAthlete({{ stat.athlete.id }})"
+                                                    title="{% if stat.athlete.is_active %}Deactivate{% else %}Activate{% endif %} athlete">
+                                                {% if stat.athlete.is_active %}
+                                                    <i data-feather="user-minus"></i>
+                                                {% else %}
+                                                    <i data-feather="user-plus"></i>
+                                                {% endif %}
+                                            </button>
+                                            {% if not stat.athlete.refresh_token %}
+                                            <a href="{{ url_for('strava_auth') }}" 
+                                               class="btn btn-outline-primary"
+                                               title="Connect Strava">
+                                                <i data-feather="link"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- No Athletes -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i data-feather="user-plus" class="text-muted mb-3" style="width: 4rem; height: 4rem;"></i>
+                    <h4 class="text-muted mb-3">No Athletes Found</h4>
+                    <p class="text-muted mb-4">
+                        Get started by connecting the first Strava account for your team.
+                    </p>
+                    <a href="{{ url_for('strava_auth') }}" class="btn btn-primary">
+                        <i data-feather="plus" class="me-2"></i>
+                        Connect First Athlete
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Setup Instructions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="help-circle" class="me-2"></i>
+                        Setup Instructions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>For Athletes:</h6>
+                            <ol class="small">
+                                <li>Click "Connect Strava Account" button</li>
+                                <li>Authorize the application to read your Strava activities</li>
+                                <li>Your activities will be automatically synced daily</li>
+                                <li>Check your performance on the dashboard</li>
+                            </ol>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>For Administrators:</h6>
+                            <ol class="small">
+                                <li>Ensure all team members have connected their Strava accounts</li>
+                                <li>Upload the training plan Excel file</li>
+                                <li>Configure WhatsApp notifications (optional)</li>
+                                <li>Run manual sync to test the system</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleAthlete(athleteId) {
+        const button = event.target.closest('button');
+        const originalContent = button.innerHTML;
+        
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        
+        fetch(`/api/athlete/${athleteId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Reload the page to update the UI
+                window.location.reload();
+            } else {
+                showAlert('Error toggling athlete status: ' + data.message, 'danger');
+                button.disabled = false;
+                button.innerHTML = originalContent;
+            }
+        })
+        .catch(error => {
+            showAlert('Error toggling athlete status: ' + error, 'danger');
+            button.disabled = false;
+            button.innerHTML = originalContent;
+        });
+    }
+    
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        const container = document.querySelector('.container');
+        container.insertBefore(alertDiv, container.firstChild);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    }
+    
+    // Initialize feather icons when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        feather.replace();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+from app import db
+from datetime import datetime
+from sqlalchemy import Text, Float, Integer, String, DateTime, Boolean
+
+class Athlete(db.Model):
+    """Model for storing athlete information and Strava credentials"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    strava_athlete_id = db.Column(db.Integer, unique=True, nullable=True)
+    refresh_token = db.Column(db.String(255), nullable=True)
+    access_token = db.Column(db.String(255), nullable=True)
+    token_expires_at = db.Column(db.DateTime, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    activities = db.relationship('Activity', backref='athlete', lazy=True)
+    planned_workouts = db.relationship('PlannedWorkout', backref='athlete', lazy=True)
+    daily_summaries = db.relationship('DailySummary', backref='athlete', lazy=True)
+
+class Activity(db.Model):
+    """Model for storing Strava activity data"""
+    id = db.Column(db.Integer, primary_key=True)
+    strava_activity_id = db.Column(db.Integer, unique=True, nullable=False)
+    athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    activity_type = db.Column(db.String(50), nullable=False)
+    start_date = db.Column(db.DateTime, nullable=False)
+    distance_km = db.Column(db.Float, nullable=False)
+    moving_time_seconds = db.Column(db.Integer, nullable=False)
+    pace_min_per_km = db.Column(db.Float, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class PlannedWorkout(db.Model):
+    """Model for storing planned workouts from Excel file"""
+    id = db.Column(db.Integer, primary_key=True)
+    athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=False)
+    workout_date = db.Column(db.DateTime, nullable=False)
+    planned_distance_km = db.Column(db.Float, nullable=False)
+    planned_pace_min_per_km = db.Column(db.Float, nullable=False)
+    workout_type = db.Column(db.String(100), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class DailySummary(db.Model):
+    """Model for storing daily performance summaries"""
+    id = db.Column(db.Integer, primary_key=True)
+    athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=False)
+    summary_date = db.Column(db.DateTime, nullable=False)
+    actual_distance_km = db.Column(db.Float, nullable=True)
+    planned_distance_km = db.Column(db.Float, nullable=True)
+    actual_pace_min_per_km = db.Column(db.Float, nullable=True)
+    planned_pace_min_per_km = db.Column(db.Float, nullable=True)
+    distance_variance_percent = db.Column(db.Float, nullable=True)
+    pace_variance_percent = db.Column(db.Float, nullable=True)
+    status = db.Column(db.String(50), nullable=True)  # On Track, Under-performed, etc.
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SystemLog(db.Model):
+    """Model for storing system execution logs"""
+    id = db.Column(db.Integer, primary_key=True)
+    log_date = db.Column(db.DateTime, nullable=False)
+    log_type = db.Column(db.String(50), nullable=False)  # SUCCESS, ERROR, WARNING
+    message = db.Column(db.Text, nullable=False)
+    details = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

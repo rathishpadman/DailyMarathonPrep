@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+{% block title %}Training Plan - Marathon Training Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <h1 class="display-5">
+                <i data-feather="calendar" class="me-3"></i>
+                Training Plan Management
+            </h1>
+            <p class="lead">
+                Upload and manage your team's daily training schedule
+            </p>
+        </div>
+        <div class="col-lg-4 text-lg-end">
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i data-feather="upload" class="me-2"></i>
+                Upload Training Plan
+            </button>
+        </div>
+    </div>
+
+    <!-- File Validation Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="file-text" class="me-2"></i>
+                        Current Training Plan Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <h6>File Information</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>File Path:</strong> {{ training_plan_file }}</li>
+                                <li><strong>File Exists:</strong> 
+                                    {% if validation_results.file_exists %}
+                                        <span class="text-success">
+                                            <i data-feather="check-circle" class="me-1"></i>
+                                            Yes
+                                        </span>
+                                    {% else %}
+                                        <span class="text-danger">
+                                            <i data-feather="x-circle" class="me-1"></i>
+                                            No
+                                        </span>
+                                    {% endif %}
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Validation Results</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Required Columns:</strong>
+                                    {% if validation_results.required_columns %}
+                                        <span class="text-success">
+                                            <i data-feather="check-circle" class="me-1"></i>
+                                            Valid
+                                        </span>
+                                    {% else %}
+                                        <span class="text-danger">
+                                            <i data-feather="x-circle" class="me-1"></i>
+                                            Missing columns
+                                        </span>
+                                    {% endif %}
+                                </li>
+                                <li><strong>Data Types:</strong>
+                                    {% if validation_results.data_types %}
+                                        <span class="text-success">
+                                            <i data-feather="check-circle" class="me-1"></i>
+                                            Valid
+                                        </span>
+                                    {% else %}
+                                        <span class="text-warning">
+                                            <i data-feather="alert-triangle" class="me-1"></i>
+                                            Issues found
+                                        </span>
+                                    {% endif %}
+                                </li>
+                                <li><strong>Data Quality:</strong>
+                                    {% if validation_results.data_quality %}
+                                        <span class="text-success">
+                                            <i data-feather="check-circle" class="me-1"></i>
+                                            Good
+                                        </span>
+                                    {% else %}
+                                        <span class="text-warning">
+                                            <i data-feather="alert-triangle" class="me-1"></i>
+                                            Needs review
+                                        </span>
+                                    {% endif %}
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    {% if not validation_results.file_exists %}
+                    <div class="alert alert-warning mt-3">
+                        <i data-feather="alert-triangle" class="me-2"></i>
+                        <strong>Training plan file not found.</strong> 
+                        Please upload a valid Excel file with your team's training schedule.
+                    </div>
+                    {% elif not validation_results.required_columns %}
+                    <div class="alert alert-danger mt-3">
+                        <i data-feather="x-circle" class="me-2"></i>
+                        <strong>Invalid file format.</strong> 
+                        The Excel file must contain the following columns: Date, AthleteName, PlannedDistanceKM, PlannedPaceMinPerKM, WorkoutType, Notes.
+                    </div>
+                    {% elif not validation_results.data_types or not validation_results.data_quality %}
+                    <div class="alert alert-warning mt-3">
+                        <i data-feather="alert-triangle" class="me-2"></i>
+                        <strong>Data quality issues detected.</strong> 
+                        Some rows may have invalid data formats. Please review your Excel file.
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success mt-3">
+                        <i data-feather="check-circle" class="me-2"></i>
+                        <strong>Training plan is valid and ready to use!</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excel Format Requirements -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="info" class="me-2"></i>
+                        Excel File Format Requirements
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Required Columns:</h6>
+                            <ul class="small">
+                                <li><strong>Date:</strong> YYYY-MM-DD format (e.g., 2024-01-15)</li>
+                                <li><strong>AthleteName:</strong> Full name of the athlete</li>
+                                <li><strong>PlannedDistanceKM:</strong> Distance in kilometers (e.g., 10.5)</li>
+                                <li><strong>PlannedPaceMinPerKM:</strong> Pace in minutes per km (e.g., 5.5 for 5:30 min/km)</li>
+                                <li><strong>WorkoutType:</strong> Type of workout (e.g., "Easy Run", "Tempo", "Intervals")</li>
+                                <li><strong>Notes:</strong> Additional notes or instructions</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Sample Data:</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead>
+                                        <tr class="small">
+                                            <th>Date</th>
+                                            <th>AthleteName</th>
+                                            <th>PlannedDistanceKM</th>
+                                            <th>PlannedPaceMinPerKM</th>
+                                            <th>WorkoutType</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="small">
+                                        <tr>
+                                            <td>2024-01-15</td>
+                                            <td>John Doe</td>
+                                            <td>10.0</td>
+                                            <td>5.5</td>
+                                            <td>Easy Run</td>
+                                        </tr>
+                                        <tr>
+                                            <td>2024-01-16</td>
+                                            <td>Jane Smith</td>
+                                            <td>8.0</td>
+                                            <td>4.8</td>
+                                            <td>Tempo Run</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Workouts -->
+    {% if recent_workouts %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="clock" class="me-2"></i>
+                        Recent Planned Workouts (Last 7 Days)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Athlete</th>
+                                    <th>Distance</th>
+                                    <th>Target Pace</th>
+                                    <th>Workout Type</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for workout in recent_workouts %}
+                                <tr>
+                                    <td>{{ workout.workout_date.strftime('%Y-%m-%d') }}</td>
+                                    <td><strong>{{ workout.athlete.name }}</strong></td>
+                                    <td>{{ "%.1f"|format(workout.planned_distance_km) }} km</td>
+                                    <td>
+                                        {% set pace_min = workout.planned_pace_min_per_km|int %}
+                                        {% set pace_sec = ((workout.planned_pace_min_per_km - pace_min) * 60)|int %}
+                                        {{ "%d:%02d"|format(pace_min, pace_sec) }} /km
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-outline-primary">{{ workout.workout_type or 'Regular Run' }}</span>
+                                    </td>
+                                    <td>
+                                        {% if workout.notes %}
+                                            <small class="text-muted">{{ workout.notes[:100] }}{% if workout.notes|length > 100 %}...{% endif %}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Upcoming Workouts -->
+    {% if upcoming_workouts %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="calendar" class="me-2"></i>
+                        Upcoming Planned Workouts
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Athlete</th>
+                                    <th>Distance</th>
+                                    <th>Target Pace</th>
+                                    <th>Workout Type</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for workout in upcoming_workouts %}
+                                <tr class="{% if workout.workout_date == date.today() %}table-warning{% endif %}">
+                                    <td>
+                                        {{ workout.workout_date.strftime('%Y-%m-%d') }}
+                                        {% if workout.workout_date == date.today() %}
+                                            <span class="badge bg-warning ms-2">Today</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><strong>{{ workout.athlete.name }}</strong></td>
+                                    <td>{{ "%.1f"|format(workout.planned_distance_km) }} km</td>
+                                    <td>
+                                        {% set pace_min = workout.planned_pace_min_per_km|int %}
+                                        {% set pace_sec = ((workout.planned_pace_min_per_km - pace_min) * 60)|int %}
+                                        {{ "%d:%02d"|format(pace_min, pace_sec) }} /km
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-outline-primary">{{ workout.workout_type or 'Regular Run' }}</span>
+                                    </td>
+                                    <td>
+                                        {% if workout.notes %}
+                                            <small class="text-muted">{{ workout.notes[:100] }}{% if workout.notes|length > 100 %}...{% endif %}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i data-feather="upload" class="me-2"></i>
+                    Upload Training Plan
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i data-feather="info" class="me-2"></i>
+                    <strong>Note:</strong> File upload functionality requires server-side implementation.
+                    For now, please manually place your Excel file in the application directory as 
+                    <code>{{ training_plan_file }}</code>.
+                </div>
+                
+                <h6>Required File Format:</h6>
+                <ul class="small">
+                    <li>Excel file (.xlsx or .xls)</li>
+                    <li>Must contain all required columns</li>
+                    <li>Date format: YYYY-MM-DD</li>
+                    <li>Numeric values for distance and pace</li>
+                </ul>
+                
+                <h6 class="mt-3">Steps to Upload:</h6>
+                <ol class="small">
+                    <li>Prepare your Excel file with the correct format</li>
+                    <li>Save it as <code>{{ training_plan_file }}</code></li>
+                    <li>Place it in the application root directory</li>
+                    <li>Run manual sync to load the data</li>
+                </ol>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Close
+                </button>
+                <button type="button" class="btn btn-primary" onclick="runManualTask()">
+                    <i data-feather="refresh-cw" class="me-2"></i>
+                    Sync Training Plan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Initialize feather icons when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        feather.replace();
+        
+        // Add today's date for comparison
+        window.date = {
+            today: () => new Date().toISOString().split('T')[0]
+        };
+    });
+</script>
+{% endblock %}

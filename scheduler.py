@@ -26,12 +26,12 @@ class DailyTaskScheduler:
         self.dashboard_builder = DashboardBuilder()
         self.notification_manager = NotificationManager()
     
-    def execute_daily_tasks(self) -> bool:
+    def execute_daily_tasks(self, target_date: datetime = None) -> bool:
         """Execute the complete daily task workflow"""
-        execution_date = datetime.now()
-        yesterday = execution_date - timedelta(days=1)
+        if target_date is None:
+            target_date = datetime.now()
         
-        logger.info(f"Starting daily task execution for {yesterday.strftime('%Y-%m-%d')}")
+        logger.info(f"Starting daily task execution for {target_date.strftime('%Y-%m-%d')}")
         
         try:
             with app.app_context():
@@ -39,10 +39,10 @@ class DailyTaskScheduler:
                 self._update_training_plan()
                 
                 # Step 2: Fetch and process Strava data for all athletes
-                self._fetch_and_process_strava_data(yesterday)
+                self._fetch_and_process_strava_data(target_date)
                 
                 # Step 3: Generate dashboard
-                dashboard_data = self.dashboard_builder.build_daily_dashboard(yesterday)
+                dashboard_data = self.dashboard_builder.build_daily_dashboard(target_date)
                 
                 # Step 4: Send notifications
                 if dashboard_data:

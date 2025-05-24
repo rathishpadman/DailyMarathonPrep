@@ -16,13 +16,19 @@
             </p>
         </div>
         <div class="col-lg-4 text-lg-end">
-            <div class="input-group">
-                <span class="input-group-text">
-                    <i data-feather="calendar"></i>
-                </span>
-                <input type="date" class="form-control" id="dateSelector" 
-                       value="{{ target_date.strftime('%Y-%m-%d') }}"
-                       onchange="changeDashboardDate(this.value)">
+            <div class="d-flex gap-2 align-items-center">
+                <button class="btn btn-outline-primary" onclick="runManualStravaSync()" title="Sync Strava Activities">
+                    <i data-feather="refresh-cw" class="me-1"></i>
+                    Sync Strava
+                </button>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i data-feather="calendar"></i>
+                    </span>
+                    <input type="date" class="form-control" id="dateSelector" 
+                           value="{{ target_date.strftime('%Y-%m-%d') }}"
+                           onchange="changeDashboardDate(this.value)">
+                </div>
             </div>
         </div>
     </div>

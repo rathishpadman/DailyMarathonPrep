@@ -250,11 +250,13 @@ class DailyTaskScheduler:
             logger.error(f"Failed to log system event: {e}")
     
     def schedule_daily_execution(self):
-        """Schedule the daily task execution"""
-        execution_time = Config.DAILY_EXECUTION_TIME
-        schedule.every().day.at(execution_time).do(self.execute_daily_tasks)
+        """Schedule the daily task execution - 3 times per day"""
+        # Schedule 3 syncs per day as requested: 9 AM, 5 PM, and 10 PM
+        schedule.every().day.at("09:00").do(self.execute_daily_tasks)
+        schedule.every().day.at("17:00").do(self.execute_daily_tasks)  # 5 PM
+        schedule.every().day.at("22:00").do(self.execute_daily_tasks)  # 10 PM
         
-        logger.info(f"Scheduled daily execution at {execution_time}")
+        logger.info("Scheduled daily Strava syncs at 9:00 AM, 5:00 PM, and 10:00 PM")
         
         # Keep the scheduler running
         while True:

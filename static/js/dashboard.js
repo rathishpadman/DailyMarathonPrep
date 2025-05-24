@@ -250,7 +250,52 @@ function createStatusBreakdownChart(canvasId, statusData) {
 }
 
 /**
- * Run manual task execution
+ * Run manual Strava sync
+ */
+function runManualStravaSync(targetDate = null) {
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i data-feather="loader" class="me-1"></i> Syncing...';
+    feather.replace();
+    
+    const requestData = targetDate ? { date: targetDate } : {};
+    
+    fetch('/api/manual-run', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Strava sync completed successfully! Dashboard updated with latest activities.', 'success');
+            // Reload the page to show updated data
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            showAlert(`Sync error: ${data.message}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Sync error:', error);
+        showAlert('Failed to sync Strava data. Please try again.', 'danger');
+    })
+    .finally(() => {
+        // Restore button state
+        button.disabled = false;
+        button.innerHTML = originalText;
+        feather.replace();
+    });
+}
+
+/**
+ * Run manual task execution (legacy function)
  */
 function runManualTask(targetDate = null) {
     const button = event?.target?.closest('button');

@@ -136,17 +136,26 @@ class DataProcessor:
     def save_daily_summary(self, performance_summary: Dict) -> bool:
         """Save daily performance summary to database"""
         try:
-            # Check if summary already exists
+            # Check if summary already exists (using date only, not datetime)
+            summary_date = performance_summary['summary_date']
+            if isinstance(summary_date, datetime):
+                summary_date = summary_date.date()
+            
             existing_summary = DailySummary.query.filter_by(
                 athlete_id=performance_summary['athlete_id'],
-                summary_date=performance_summary['summary_date']
+                summary_date=summary_date
             ).first()
             
             if existing_summary:
                 # Update existing summary
-                for key, value in performance_summary.items():
-                    if hasattr(existing_summary, key):
-                        setattr(existing_summary, key, value)
+                existing_summary.actual_distance_km = performance_summary['actual_distance_km']
+                existing_summary.planned_distance_km = performance_summary['planned_distance_km']
+                existing_summary.actual_pace_min_per_km = performance_summary['actual_pace_min_per_km']
+                existing_summary.planned_pace_min_per_km = performance_summary['planned_pace_min_per_km']
+                existing_summary.distance_variance_percent = performance_summary['distance_variance_percent']
+                existing_summary.pace_variance_percent = performance_summary['pace_variance_percent']
+                existing_summary.status = performance_summary['status']
+                logger.info(f"Updated existing daily summary for athlete {performance_summary['athlete_id']}")
             else:
                 # Create new summary
                 daily_summary = DailySummary(

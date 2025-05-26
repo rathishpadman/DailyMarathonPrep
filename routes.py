@@ -29,7 +29,7 @@ def index():
             Athlete.is_active == True
         ).scalar() or 0
 
-        # Monthly stats (last 30 days) - only count activities from active athletes
+        # Monthly stats (last 30 days) - only count activities from active athletes  
         month_ago = datetime.now() - timedelta(days=30)
         monthly_activities = db.session.query(func.count(distinct(Activity.id))).join(Athlete).filter(
             Activity.start_date >= month_ago,
@@ -44,8 +44,15 @@ def index():
             Athlete.is_active == True
         ).all()
 
-        weekly_planned = sum(s.planned_distance_km or 0 for s in weekly_summaries)
-        weekly_actual = sum(s.actual_distance_km or 0 for s in weekly_summaries)
+        # Remove duplicates and calculate proper totals
+        unique_summaries = {}
+        for summary in weekly_summaries:
+            key = f"{summary.athlete_id}_{summary.summary_date}"
+            if key not in unique_summaries:
+                unique_summaries[key] = summary
+
+        weekly_planned = sum(s.planned_distance_km or 0 for s in unique_summaries.values())
+        weekly_actual = sum(s.actual_distance_km or 0 for s in unique_summaries.values())
 
         # Get all athletes for management
         all_athletes = db.session.query(Athlete).order_by(Athlete.name).all()
@@ -118,51 +125,72 @@ def get_filtered_summary_data(period='week'):
             result_data = [date_groups[date] for date in sorted_dates]
             
         elif period == 'week':
-            # Define week start as Monday, get weeks from May 19, 2025
+            # Define week start as May 19, 2025 (Week 1)
             base_date = datetime(2025, 5, 19).date()  # Week 1 starts May 19
             
             # Calculate current week number
             current_date = end_date.date()
-            weeks_since_base = (current_date - base_date).days // 7
+            days_since_base = (current_date - base_date).days
+            weeks_since_base = days_since_base // 7
             
             week_groups = {}
-            for week_num in range(max(0, weeks_since_base - 9), weeks_since_base + 1):  # Latest 10 weeks
+            # Get latest 10 weeks
+            start_week = max(0, weeks_since_base - 9)
+            end_week = weeks_since_base + 1
+            
+            for week_num in range(start_week, end_week):
                 week_start = base_date + timedelta(weeks=week_num)
                 week_end = week_start + timedelta(days=6)
                 
                 # Get summaries for this week
-                week_summaries = db.session.query(DailySummary).filter(
+                week_summaries = db.session.query(DailySummary).join(Athlete).filter(
                     DailySummary.summary_date >= week_start,
-                    DailySummary.summary_date <= week_end
+                    DailySummary.summary_date <= week_end,
+                    Athlete.is_active == True
                 ).all()
                 
-                if week_summaries:
-                    week_key = f"week-{week_num + 1}"
-                    week_groups[week_key] = {
-                        'date': week_start,
-                        'period_label': f"Week {week_num + 1} ({week_start.strftime('%d %b')} - {week_end.strftime('%d %b')})",
-                        'athletes': [],
-                        'total_planned': 0,
-                        'total_actual': 0,
-                        'completion_rate': 0
-                    }
-                    
-                    for summary in week_summaries:
-                        week_groups[week_key]['total_planned'] += summary.planned_distance_km or 0
-                        week_groups[week_key]['total_actual'] += summary.actual_distance_km or 0
-                        
-                        athlete = Athlete.query.get(summary.athlete_id)
-                        week_groups[week_key]['athletes'].append({
+                week_key = f"week-{week_num + 1}"
+                week_groups[week_key] = {
+                    'date': week_start,
+                    'period_label': f"Week {week_num + 1} ({week_start.strftime('%d %b')} - {week_end.strftime('%d %b')})",
+                    'athletes': [],
+                    'total_planned': 0,
+                    'total_actual': 0,
+                    'completion_rate': 0
+                }
+                
+                # Aggregate weekly data
+                athlete_weekly_data = {}
+                for summary in week_summaries:
+                    athlete_id = summary.athlete_id
+                    if athlete_id not in athlete_weekly_data:
+                        athlete = Athlete.query.get(athlete_id)
+                        athlete_weekly_data[athlete_id] = {
                             'name': athlete.name if athlete else 'Unknown',
-                            'planned': summary.planned_distance_km or 0,
-                            'actual': summary.actual_distance_km or 0,
-                            'status': summary.status
-                        })
+                            'planned': 0,
+                            'actual': 0,
+                            'completed_days': 0,
+                            'total_days': 0
+                        }
+                    
+                    athlete_weekly_data[athlete_id]['planned'] += summary.planned_distance_km or 0
+                    athlete_weekly_data[athlete_id]['actual'] += summary.actual_distance_km or 0
+                    athlete_weekly_data[athlete_id]['total_days'] += 1
+                    if summary.status in ['On Track', 'Over-performed']:
+                        athlete_weekly_data[athlete_id]['completed_days'] += 1
+                
+                # Calculate totals and completion rates
+                for athlete_data in athlete_weekly_data.values():
+                    week_groups[week_key]['total_planned'] += athlete_data['planned']
+                    week_groups[week_key]['total_actual'] += athlete_data['actual']
+                    completion_rate = (athlete_data['completed_days'] / athlete_data['total_days'] * 100) if athlete_data['total_days'] > 0 else 0
+                    athlete_data['status'] = 'On Track' if completion_rate >= 80 else 'Needs Improvement'
+                    week_groups[week_key]['athletes'].append(athlete_data)
             
-            result_data = list(week_groups.values())[-10:]  # Latest 10 weeks
+            result_data = [week_groups[key] for key in sorted(week_groups.keys()) if week_groups[key]['athletes']][-10:]
             
         else:  # month
-            # Get monthly data starting from May 2025
+            # Get monthly data with May-25 format
             month_groups = {}
             current_year = end_date.year
             current_month = end_date.month
@@ -181,36 +209,55 @@ def get_filtered_summary_data(period='week'):
                 else:
                     month_end = datetime(month_year, month_num + 1, 1).date() - timedelta(days=1)
                 
-                # Get summaries for this month
-                month_summaries = db.session.query(DailySummary).filter(
+                # Get summaries for this month (only active athletes)
+                month_summaries = db.session.query(DailySummary).join(Athlete).filter(
                     DailySummary.summary_date >= month_start,
-                    DailySummary.summary_date <= month_end
+                    DailySummary.summary_date <= month_end,
+                    Athlete.is_active == True
                 ).all()
                 
-                if month_summaries:
-                    month_key = month_start.strftime('%b-%y')
-                    month_groups[month_key] = {
-                        'date': month_start,
-                        'period_label': month_start.strftime('%b %Y'),
-                        'athletes': [],
-                        'total_planned': 0,
-                        'total_actual': 0,
-                        'completion_rate': 0
-                    }
-                    
-                    for summary in month_summaries:
-                        month_groups[month_key]['total_planned'] += summary.planned_distance_km or 0
-                        month_groups[month_key]['total_actual'] += summary.actual_distance_km or 0
-                        
-                        athlete = Athlete.query.get(summary.athlete_id)
-                        month_groups[month_key]['athletes'].append({
+                # Format month as May-25, Jun-25, etc.
+                month_label = f"{month_start.strftime('%b')}-{str(month_year)[2:]}"
+                month_key = f"{month_year}-{month_num:02d}"
+                
+                month_groups[month_key] = {
+                    'date': month_start,
+                    'period_label': month_label,
+                    'athletes': [],
+                    'total_planned': 0,
+                    'total_actual': 0,
+                    'completion_rate': 0
+                }
+                
+                # Aggregate monthly data by athlete
+                athlete_monthly_data = {}
+                for summary in month_summaries:
+                    athlete_id = summary.athlete_id
+                    if athlete_id not in athlete_monthly_data:
+                        athlete = Athlete.query.get(athlete_id)
+                        athlete_monthly_data[athlete_id] = {
                             'name': athlete.name if athlete else 'Unknown',
-                            'planned': summary.planned_distance_km or 0,
-                            'actual': summary.actual_distance_km or 0,
-                            'status': summary.status
-                        })
+                            'planned': 0,
+                            'actual': 0,
+                            'completed_days': 0,
+                            'total_days': 0
+                        }
+                    
+                    athlete_monthly_data[athlete_id]['planned'] += summary.planned_distance_km or 0
+                    athlete_monthly_data[athlete_id]['actual'] += summary.actual_distance_km or 0
+                    athlete_monthly_data[athlete_id]['total_days'] += 1
+                    if summary.status in ['On Track', 'Over-performed']:
+                        athlete_monthly_data[athlete_id]['completed_days'] += 1
+                
+                # Calculate totals and completion rates
+                for athlete_data in athlete_monthly_data.values():
+                    month_groups[month_key]['total_planned'] += athlete_data['planned']
+                    month_groups[month_key]['total_actual'] += athlete_data['actual']
+                    completion_rate = (athlete_data['completed_days'] / athlete_data['total_days'] * 100) if athlete_data['total_days'] > 0 else 0
+                    athlete_data['status'] = 'On Track' if completion_rate >= 80 else 'Needs Improvement'
+                    month_groups[month_key]['athletes'].append(athlete_data)
             
-            result_data = list(month_groups.values())[-10:]  # Latest 10 months
+            result_data = [month_groups[key] for key in sorted(month_groups.keys()) if month_groups[key]['athletes']][-10:]
 
         # Calculate completion rates for all periods
         for period_data in result_data:

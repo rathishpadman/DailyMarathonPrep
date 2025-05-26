@@ -298,74 +298,75 @@ class ExcelReader:
             }
 
     def read_planned_workouts(self) -> List[dict]:
-        """Read planned workouts from Excel file"""
+        """Read planned workouts from Excel file with improved column mapping"""
         try:
             if not os.path.exists(self.file_path):
                 logger.error(f"Excel file not found: {self.file_path}")
                 return []
 
-            # First validate the file format to get column mapping
-            validation_result = self.validate_excel_format()
-            if not validation_result.get('file_exists', False):
-                logger.error("File validation failed")
-                return []
-
-            # Read file using the same approach as validation
+            # Read file with proper error handling
             df = None
             try:
-                if self.file_path.endswith('.csv'):
+                if self.file_path.lower().endswith('.csv'):
                     df = pd.read_csv(self.file_path)
                 else:
-                    try:
-                        df = pd.read_excel(self.file_path, engine='openpyxl')
-                    except:
-                        try:
-                            df = pd.read_excel(self.file_path, engine='xlrd')
-                        except:
-                            try:
-                                df = pd.read_csv(self.file_path, sep=';')
-                            except:
-                                df = pd.read_csv(self.file_path, sep='\t')
+                    df = pd.read_excel(self.file_path, engine='openpyxl')
             except Exception as e:
                 logger.error(f"Cannot read file: {e}")
                 return []
 
             if df is None or df.empty:
-                logger.warning("Excel file is empty")
+                logger.warning("File is empty")
                 return []
 
-            # Use column mapping from validation
-            column_mapping = validation_result.get('column_mapping', {})
-            if not column_mapping:
-                # Create basic mapping if not available
-                actual_columns = df.columns.tolist()
-                column_mapping = {}
-                for req_col in ['Date', 'Athlete', 'Distance_km', 'Pace_min_per_km', 'Workout_Type']:
-                    for actual_col in actual_columns:
-                        if req_col.lower() in actual_col.lower() or actual_col.lower() in req_col.lower():
-                            column_mapping[req_col] = actual_col
+            # Create flexible column mapping
+            column_mapping = {}
+            actual_columns = df.columns.tolist()
+            
+            # Map required columns with flexible matching
+            required_mappings = {
+                'Date': ['date', 'workout_date', 'training_date'],
+                'AthleteName': ['athletename', 'athlete_name', 'athlete', 'name'],
+                'PlannedDistanceKM': ['planneddistancekm', 'planned_distance_km', 'distance_km', 'distance'],
+                'PlannedPaceMinPerKM': ['plannedpaceminperkm', 'planned_pace_min_per_km', 'pace_min_per_km', 'pace'],
+                'WorkoutType': ['workouttype', 'workout_type', 'type'],
+                'Notes': ['notes', 'note', 'description']
+            }
+
+            for standard_col, possible_names in required_mappings.items():
+                column_mapping[standard_col] = None
+                for actual_col in actual_columns:
+                    if actual_col == standard_col:  # Exact match first
+                        column_mapping[standard_col] = actual_col
+                        break
+                    # Then try fuzzy matching
+                    for possible_name in possible_names:
+                        if possible_name.lower() in actual_col.lower():
+                            column_mapping[standard_col] = actual_col
                             break
+                    if column_mapping[standard_col]:
+                        break
+
+            # Check if we have essential columns
+            if not column_mapping.get('Date') or not column_mapping.get('AthleteName'):
+                logger.error(f"Missing essential columns. Available: {actual_columns}")
+                return []
 
             planned_workouts = []
 
             for index, row in df.iterrows():
                 try:
-                    # Get values using column mapping
-                    date_col = column_mapping.get('Date')
-                    athlete_col = column_mapping.get('Athlete')
-                    distance_col = column_mapping.get('Distance_km')
-                    pace_col = column_mapping.get('Pace_min_per_km')
-                    workout_type_col = column_mapping.get('Workout_Type')
-
-                    if not date_col or not athlete_col:
-                        logger.warning(f"Missing essential columns in row {index}")
-                        continue
-
                     # Parse date
-                    workout_date = pd.to_datetime(row[date_col]).date()
+                    date_col = column_mapping['Date']
+                    workout_date = pd.to_datetime(row[date_col], dayfirst=True).date()
+
+                    # Get athlete name
+                    athlete_col = column_mapping['AthleteName']
+                    athlete_name = str(row[athlete_col]).strip()
 
                     # Extract distance with fallback
                     distance = 0.0
+                    distance_col = column_mapping.get('PlannedDistanceKM')
                     if distance_col and pd.notna(row[distance_col]):
                         try:
                             distance = float(row[distance_col])
@@ -374,19 +375,32 @@ class ExcelReader:
 
                     # Extract pace with fallback
                     pace = 0.0
+                    pace_col = column_mapping.get('PlannedPaceMinPerKM')
                     if pace_col and pd.notna(row[pace_col]):
                         try:
                             pace = float(row[pace_col])
                         except (ValueError, TypeError):
                             logger.warning(f"Invalid pace value in row {index}: {row[pace_col]}")
 
+                    # Get workout type
+                    workout_type = 'General'
+                    workout_type_col = column_mapping.get('WorkoutType')
+                    if workout_type_col and pd.notna(row[workout_type_col]):
+                        workout_type = str(row[workout_type_col]).strip()
+
+                    # Get notes
+                    notes = ''
+                    notes_col = column_mapping.get('Notes')
+                    if notes_col and pd.notna(row[notes_col]):
+                        notes = str(row[notes_col]).strip()
+
                     workout = {
-                        'athlete_name': str(row[athlete_col]).strip(),
+                        'athlete_name': athlete_name,
                         'workout_date': workout_date,
                         'planned_distance_km': distance,
                         'planned_pace_min_per_km': pace,
-                        'workout_type': str(row[workout_type_col]).strip() if workout_type_col and pd.notna(row[workout_type_col]) else 'General',
-                        'notes': str(row.get('Notes', '')).strip() if pd.notna(row.get('Notes', '')) else ''
+                        'workout_type': workout_type,
+                        'notes': notes
                     }
 
                     planned_workouts.append(workout)

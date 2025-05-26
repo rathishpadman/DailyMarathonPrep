@@ -1,12 +1,29 @@
-
-Date,Athlete,Distance_km,Pace_min_per_km,Workout_Type,Notes
-2025-05-26,Rathish Padman,10.0,5.30,Long Run,Morning run
-2025-05-26,Srini T,8.0,5.45,Easy Run,Recovery pace
-2025-05-27,Rathish Padman,6.0,5.00,Tempo Run,Threshold pace
-2025-05-27,Srini T,5.0,6.00,Easy Run,Recovery day
-2025-05-28,Rathish Padman,12.0,6.00,Long Run,Weekly long run
-2025-05-28,Srini T,10.0,5.30,Medium Run,Steady effort
-2025-05-29,Rathish Padman,5.0,4.45,Interval Run,Speed work
-2025-05-29,Srini T,4.0,5.15,Easy Run,Recovery
-2025-05-30,Rathish Padman,8.0,5.15,Easy Run,Active recovery
-2025-05-30,Srini T,6.0,5.45,Easy Run,Base building
+Date,AthleteName,PlannedDistanceKM,PlannedPaceMinPerKM,WorkoutType,Notes
+2025-05-19,John Smith,10.0,5.5,Easy Run,Morning run
+2025-05-19,Jane Doe,8.0,6.0,Easy Run,Recovery pace
+2025-05-20,John Smith,12.0,5.2,Tempo Run,3x4km tempo
+2025-05-20,Jane Doe,10.0,5.8,Long Run,Build endurance
+2025-05-21,John Smith,15.0,5.8,Long Run,Weekly long run
+2025-05-21,Jane Doe,12.0,6.2,Easy Run,Easy aerobic
+2025-05-22,John Smith,8.0,5.0,Speed Work,Track intervals
+2025-05-22,Jane Doe,6.0,5.5,Recovery Run,Active recovery
+2025-05-23,John Smith,0.0,0.0,Rest Day,Complete rest
+2025-05-23,Jane Doe,5.0,6.5,Easy Run,Light jog
+2025-05-24,John Smith,10.0,5.3,Tempo Run,Threshold pace
+2025-05-24,Jane Doe,8.0,6.0,Easy Run,Aerobic base
+2025-05-25,John Smith,20.0,6.0,Long Run,Marathon pace segments
+2025-05-25,Jane Doe,16.0,6.5,Long Run,Build weekly volume
+2025-05-26,John Smith,12.0,5.5,Easy Run,Week start easy
+2025-05-26,Jane Doe,10.0,6.0,Easy Run,Recovery from long run
+2025-05-27,John Smith,8.0,4.8,Speed Work,400m repeats
+2025-05-27,Jane Doe,6.0,5.8,Easy Run,Light training
+2025-05-28,John Smith,10.0,5.4,Tempo Run,Sustained effort
+2025-05-28,Jane Doe,8.0,6.1,Easy Run,Aerobic development
+2025-05-29,John Smith,6.0,6.0,Recovery Run,Easy pace
+2025-05-29,Jane Doe,5.0,6.5,Recovery Run,Very easy
+2025-05-30,John Smith,14.0,5.6,Medium Long Run,Progressive pace
+2025-05-30,Jane Doe,12.0,6.2,Easy Run,Steady effort
+2025-05-31,John Smith,8.0,5.2,Easy Run,Relaxed pace
+2025-05-31,Jane Doe,6.0,6.0,Easy Run,End of week easy
+2025-06-01,John Smith,22.0,6.2,Long Run,Marathon simulation
+2025-06-01,Jane Doe,18.0,6.8,Long Run,Volume building

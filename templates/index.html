@@ -59,17 +59,16 @@
                 <div class="card-body">
                     <div class="row">
                         {% for athlete in all_athletes %}
+                        {% if athlete.is_active %}
                         <div class="col-md-4 mb-2">
-                            <div class="d-flex justify-content-between align-items-center p-2 border rounded">
-                                <span class="{% if athlete.is_active %}text-success{% else %}text-muted{% endif %}">
-                                    <i data-feather="{% if athlete.is_active %}user-check{% else %}user-x{% endif %}" class="me-2"></i>
+                            <div class="p-2 border rounded">
+                                <a href="{{ url_for('dashboard', athlete_id=athlete.id) }}" class="text-decoration-none text-success">
+                                    <i data-feather="user-check" class="me-2"></i>
                                     {{ athlete.name }}
-                                </span>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="toggleAthlete({{ athlete.id }})">
-                                    {% if athlete.is_active %}Deactivate{% else %}Activate{% endif %}
-                                </button>
+                                </a>
                             </div>
                         </div>
+                        {% endif %}
                         {% endfor %}
                     </div>
                 </div>
@@ -178,10 +177,10 @@
 </div>
 
 <script>
-// Period filter functionality
+// Period filter functionality with AJAX
 document.querySelectorAll('input[name="period"]').forEach(radio => {
     radio.addEventListener('change', function() {
-        window.location.href = '?period=' + this.value;
+        updateSummaryData(this.value);
     });
 });
 
@@ -203,22 +202,7 @@ function runManualSync() {
     .catch(error => alert('Error: ' + error.message));
 }
 
-// Toggle athlete function
-function toggleAthlete(athleteId) {
-    fetch(`/api/athlete/${athleteId}/toggle`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'}
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.reload();
-        } else {
-            alert('Failed to toggle athlete: ' + data.message);
-        }
-    })
-    .catch(error => alert('Error: ' + error.message));
-}
+// Removed toggleAthlete function as athlete management moved to separate page
 
 function updateSummaryData(period) {
     // Show loading indicator

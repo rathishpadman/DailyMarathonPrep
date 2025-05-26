@@ -146,6 +146,30 @@ def dashboard():
 
         # Build filtered dashboard data
         dashboard_data = get_enhanced_dashboard_data(
+            target_date, athlete_filter, period_filter, activity_filter
+        )
+
+        # Get weekly trends
+        dashboard_builder = DashboardBuilder()
+        weekly_trends = dashboard_builder.get_weekly_trends(target_date)
+
+        return render_template('dashboard.html',
+                               dashboard_data=dashboard_data,
+                               weekly_trends=weekly_trends,
+                               target_date=target_date,
+                               all_athletes=all_athletes,
+                               filters={
+                                   'athlete_id': athlete_filter,
+                                   'date': date_filter,
+                                   'period': period_filter,
+                                   'activity_type': activity_filter
+                               })
+
+    except Exception as e:
+        logger.error(f"Error loading dashboard: {e}")
+        flash(f"Error loading dashboard: {e}", "error")
+        return redirect(url_for('index'))
+
 
 def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter='week', activity_filter='all'):
     """Get enhanced dashboard data with comprehensive filtering"""
@@ -221,31 +245,6 @@ def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter=
     except Exception as e:
         logger.error(f"Error getting enhanced dashboard data: {e}")
         return {'summaries': [], 'period_stats': {}}
-
-
-            target_date, athlete_filter, period_filter, activity_filter
-        )
-
-        # Get weekly trends
-        dashboard_builder = DashboardBuilder()
-        weekly_trends = dashboard_builder.get_weekly_trends(target_date)
-
-        return render_template('dashboard.html',
-                               dashboard_data=dashboard_data,
-                               weekly_trends=weekly_trends,
-                               target_date=target_date,
-                               all_athletes=all_athletes,
-                               filters={
-                                   'athlete_id': athlete_filter,
-                                   'date': date_filter,
-                                   'period': period_filter,
-                                   'activity_type': activity_filter
-                               })
-
-    except Exception as e:
-        logger.error(f"Error loading dashboard: {e}")
-        flash(f"Error loading dashboard: {e}", "error")
-        return redirect(url_for('index'))
 
 
 @app.route('/athletes')

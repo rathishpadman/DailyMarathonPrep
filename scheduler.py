@@ -6,6 +6,7 @@ from threading import Thread
 from typing import Optional
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from config import Config
 from strava_client import StravaClient
 from excel_reader import ExcelReader
 from data_processor import DataProcessor

@@ -457,32 +457,6 @@ def strava_callback():
 
         # Get or create athlete
         athlete_info = token_data.get('athlete', {})
-
-@app.route('/api/summary-stats/<period>')
-def api_summary_stats(period):
-    """API endpoint for real-time summary statistics"""
-    try:
-        summary_data = get_filtered_summary_data(period)
-
-        # Calculate totals
-        total_planned = sum(day['total_planned'] for day in summary_data)
-        total_actual = sum(day['total_actual'] for day in summary_data)
-        avg_completion = sum(day['completion_rate'] for day in summary_data) / len(summary_data) if summary_data else 0
-
-        return jsonify({
-            'period': period,
-            'total_planned': total_planned,
-            'total_actual': total_actual,
-            'variance_percent': ((total_actual - total_planned) / total_planned * 100) if total_planned > 0 else 0,
-            'avg_completion_rate': avg_completion,
-            'data_points': len(summary_data)
-        })
-
-    except Exception as e:
-        logger.error(f"Error getting summary stats: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
         strava_athlete_id = athlete_info.get('id')
         athlete_name = f"{athlete_info.get('firstname', '')} {athlete_info.get('lastname', '')}".strip(
         )
@@ -627,6 +601,31 @@ def sync_current():
         error_msg = f"Error during sync: {e}"
         logger.error(error_msg)
         return jsonify({"success": False, "message": error_msg})
+
+
+@app.route('/api/summary-stats/<period>')
+def api_summary_stats(period):
+    """API endpoint for real-time summary statistics"""
+    try:
+        summary_data = get_filtered_summary_data(period)
+
+        # Calculate totals
+        total_planned = sum(day['total_planned'] for day in summary_data)
+        total_actual = sum(day['total_actual'] for day in summary_data)
+        avg_completion = sum(day['completion_rate'] for day in summary_data) / len(summary_data) if summary_data else 0
+
+        return jsonify({
+            'period': period,
+            'total_planned': total_planned,
+            'total_actual': total_actual,
+            'variance_percent': ((total_actual - total_planned) / total_planned * 100) if total_planned > 0 else 0,
+            'avg_completion_rate': avg_completion,
+            'data_points': len(summary_data)
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting summary stats: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.errorhandler(404)

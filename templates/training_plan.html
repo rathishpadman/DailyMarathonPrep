@@ -272,10 +272,10 @@
                             </thead>
                             <tbody>
                                 {% for workout in upcoming_workouts %}
-                                <tr class="{% if workout.workout_date == date.today() %}table-warning{% endif %}">
+                                <tr class="{% if workout.workout_date == today %}table-warning{% endif %}">
                                     <td>
                                         {{ workout.workout_date.strftime('%Y-%m-%d') }}
-                                        {% if workout.workout_date == date.today() %}
+                                        {% if workout.workout_date == today %}
                                             <span class="badge bg-warning ms-2">Today</span>
                                         {% endif %}
                                     </td>

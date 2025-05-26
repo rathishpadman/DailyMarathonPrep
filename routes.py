@@ -168,7 +168,8 @@ def training_plan():
                                validation_results=validation_results,
                                recent_workouts=recent_workouts,
                                upcoming_workouts=upcoming_workouts,
-                               training_plan_file=Config.TRAINING_PLAN_FILE)
+                               training_plan_file=Config.TRAINING_PLAN_FILE,
+                               today=today)
 
     except Exception as e:
         logger.error(f"Error loading training plan page: {e}")

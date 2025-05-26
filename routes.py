@@ -889,6 +889,89 @@ def api_summary_stats(period):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/debug/km-mismatch/<int:athlete_id>/<date>')
+def debug_km_mismatch(athlete_id, date):
+    """Debug route to investigate KM mismatches for specific athlete and date"""
+    try:
+        target_date = datetime.strptime(date, '%Y-%m-%d').date()
+        
+        # Get planned workout
+        planned_workout = db.session.query(PlannedWorkout).filter(
+            and_(
+                PlannedWorkout.athlete_id == athlete_id,
+                func.date(PlannedWorkout.workout_date) == target_date
+            )
+        ).first()
+        
+        # Get activities for that date
+        start_of_day = datetime.combine(target_date, datetime.min.time())
+        end_of_day = start_of_day + timedelta(days=1)
+        
+        activities = db.session.query(Activity).filter(
+            and_(
+                Activity.athlete_id == athlete_id,
+                Activity.start_date >= start_of_day,
+                Activity.start_date < end_of_day
+            )
+        ).all()
+        
+        # Get daily summary
+        daily_summary = db.session.query(DailySummary).filter_by(
+            athlete_id=athlete_id,
+            summary_date=target_date
+        ).first()
+        
+        # Get athlete info
+        athlete = Athlete.query.get(athlete_id)
+        
+        debug_info = {
+            'athlete': {
+                'id': athlete.id,
+                'name': athlete.name
+            } if athlete else None,
+            'target_date': target_date.isoformat(),
+            'planned_workout': {
+                'id': planned_workout.id,
+                'workout_date': planned_workout.workout_date.isoformat() if hasattr(planned_workout.workout_date, 'isoformat') else str(planned_workout.workout_date),
+                'planned_distance_km': planned_workout.planned_distance_km,
+                'planned_pace_min_per_km': planned_workout.planned_pace_min_per_km,
+                'workout_type': planned_workout.workout_type,
+                'notes': planned_workout.notes
+            } if planned_workout else None,
+            'activities': [
+                {
+                    'id': activity.id,
+                    'strava_activity_id': activity.strava_activity_id,
+                    'name': activity.name,
+                    'start_date': activity.start_date.isoformat(),
+                    'distance_km': activity.distance_km,
+                    'pace_min_per_km': activity.pace_min_per_km,
+                    'activity_type': activity.activity_type
+                } for activity in activities
+            ],
+            'daily_summary': {
+                'id': daily_summary.id,
+                'summary_date': daily_summary.summary_date.isoformat() if hasattr(daily_summary.summary_date, 'isoformat') else str(daily_summary.summary_date),
+                'planned_distance_km': daily_summary.planned_distance_km,
+                'actual_distance_km': daily_summary.actual_distance_km,
+                'distance_variance_percent': daily_summary.distance_variance_percent,
+                'status': daily_summary.status
+            } if daily_summary else None,
+            'debug_calculations': {
+                'total_activity_distance': sum(a.distance_km or 0 for a in activities),
+                'activity_count': len(activities),
+                'date_range_start': start_of_day.isoformat(),
+                'date_range_end': end_of_day.isoformat()
+            }
+        }
+        
+        return jsonify(debug_info)
+        
+    except Exception as e:
+        logger.error(f"Error in debug route: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""

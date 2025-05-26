@@ -95,14 +95,26 @@ class DataProcessor:
             target_date_only = target_date.date() if isinstance(target_date, datetime) else target_date
 
             # Get planned workout for the date - FIX: Use .first() to ensure single result
-            planned_workout = db.session.query(PlannedWorkout).filter_by(
-                athlete_id=athlete_id,
-                workout_date=target_date_only
+            # Handle both date and datetime objects in workout_date
+            planned_workout = db.session.query(PlannedWorkout).filter(
+                and_(
+                    PlannedWorkout.athlete_id == athlete_id,
+                    func.date(PlannedWorkout.workout_date) == target_date_only
+                )
             ).first()
+
+            # Debug logging for planned workout matching
+            if planned_workout:
+                logger.debug(f"Found planned workout: Distance: {planned_workout.planned_distance_km}, Date: {planned_workout.workout_date}")
+            else:
+                logger.debug(f"No planned workout found for athlete {athlete_id} on {target_date_only}")
 
             # Get actual activities for the date - FIX: Use proper date range and distinct
             start_of_day = datetime.combine(target_date_only, datetime.min.time())
             end_of_day = start_of_day + timedelta(days=1)
+
+            # Debug logging for activity matching
+            logger.debug(f"Looking for activities between {start_of_day} and {end_of_day}")
 
             activities = db.session.query(Activity).filter(
                 and_(
@@ -111,7 +123,11 @@ class DataProcessor:
                     Activity.start_date < end_of_day
                 )
             ).distinct().all()
-            
+
+            # Log found activities for debugging
+            for activity in activities:
+                logger.debug(f"Found activity: {activity.name}, Date: {activity.start_date}, Distance: {activity.distance_km}")
+
             # Debug logging for date comparison
             logger.debug(f"Processing athlete {athlete_id} for date {target_date_only}")
             logger.debug(f"Planned workout found: {planned_workout is not None}")

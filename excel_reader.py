@@ -1,5 +1,6 @@
 import pandas as pd
 import logging
+import os
 from datetime import datetime
 from typing import List, Dict, Optional
 from config import Config
@@ -197,10 +198,18 @@ class ExcelReader:
         try:
             # Log the file path being validated
             logger.info(f"Validating format for file: {self.file_path}")
+            
+            # Check if file exists first
+            if not os.path.exists(self.file_path):
+                logger.error(f"File does not exist: {self.file_path}")
+                return validation_results
+            
+            # Try to read the file based on extension
+            df: pd.DataFrame = None
             if self.file_path.lower().endswith(('.xlsx', '.xls')):
-                df: pd.DataFrame = pd.read_excel(self.file_path, engine='openpyxl')
+                df = pd.read_excel(self.file_path, engine='openpyxl')
             elif self.file_path.lower().endswith('.csv'):
-                df: pd.DataFrame = pd.read_csv(self.file_path)
+                df = pd.read_csv(self.file_path)
             else:
                 logger.error("Unsupported file format. Please provide an Excel or CSV file.")
                 return validation_results
@@ -219,7 +228,23 @@ class ExcelReader:
             has_all_columns = all(col in df.columns for col in required_columns)
             validation_results['required_columns'] = has_all_columns
 
-            # Additional checks for data quality and types...
+            if has_all_columns:
+                # Check data types and quality
+                try:
+                    # Test date parsing
+                    pd.to_datetime(df['Date'].head(), errors='coerce')
+                    
+                    # Test numeric columns
+                    pd.to_numeric(df['PlannedDistanceKM'].head(), errors='coerce')
+                    pd.to_numeric(df['PlannedPaceMinPerKM'].head(), errors='coerce')
+                    
+                    validation_results['data_types'] = True
+                    validation_results['data_quality'] = True
+                    
+                except Exception as e:
+                    logger.warning(f"Data validation issues: {e}")
+                    validation_results['data_types'] = False
+                    validation_results['data_quality'] = False
 
         except FileNotFoundError:
             logger.error(f"Validation failed: File not found at {self.file_path}")

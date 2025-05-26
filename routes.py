@@ -189,19 +189,20 @@ def upload_training_plan():
             flash('No file selected', 'error')
             return redirect(url_for('training_plan'))
 
-        if file and file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
+        if file and file.filename and file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
             filename = 'uploaded_training_plan' + (
                 '.xlsx' if file.filename.lower().endswith(
                     ('.xlsx', '.xls')) else '.csv')
             file_path = os.path.join(os.getcwd(), filename)
             file.save(file_path)
 
-            # Update config to use the uploaded file
-            Config.TRAINING_PLAN_FILE = filename
-
-            # Validate the uploaded file
+            # Validate the uploaded file first before updating config
             excel_reader = ExcelReader(file_path)
             validation_results = excel_reader.validate_excel_format()
+
+            if validation_results.get('file_exists', False):
+                # Update config to use the uploaded file only if validation passes
+                Config.TRAINING_PLAN_FILE = filename
 
             if validation_results.get('file_exists',
                                       False) and validation_results.get(

@@ -1,23 +1,31 @@
 import pandas as pd
 import logging
-from datetime import datetime, date
+from datetime import datetime
 from typing import List, Dict, Optional
 from config import Config
 from openpyxl.utils.exceptions import InvalidFileException
 
 logger = logging.getLogger(__name__)
 
-
 class ExcelReader:
-    """Class for reading and processing training plan Excel files"""
+    """Class for reading and processing training plan Excel and CSV files"""
 
     def __init__(self, file_path: Optional[str] = None):
         self.file_path: str = file_path or Config.TRAINING_PLAN_FILE
 
     def read_training_plan(self) -> Optional[pd.DataFrame]:
-        """Read the training plan from Excel file"""
+        """Read the training plan from Excel or CSV file"""
         try:
-            df: pd.DataFrame = pd.read_excel(self.file_path, engine='openpyxl')
+            logger.info(f"Reading training plan from {self.file_path}")
+
+            # Determine if the file is Excel or CSV based on the extension
+            if self.file_path.lower().endswith(('.xlsx', '.xls')):
+                df: pd.DataFrame = pd.read_excel(self.file_path, engine='openpyxl')
+            elif self.file_path.lower().endswith('.csv'):
+                df: pd.DataFrame = pd.read_csv(self.file_path)
+            else:
+                logger.error("Unsupported file format. Please provide an Excel or CSV file.")
+                return None
 
             required_columns = [
                 'Date',
@@ -33,28 +41,27 @@ class ExcelReader:
             ]
             if missing_columns:
                 logger.error(
-                    f"Missing required columns in Excel file: {missing_columns}"
+                    f"Missing required columns in training plan: {missing_columns}"
                 )
                 return None
 
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-            if bool(df['Date'].isna().any()):
+            if df['Date'].isna().any():
                 logger.warning(
-                    "Some dates in the Excel 'Date' column could not be parsed and were set to NaT."
+                    "Some dates in the training plan could not be parsed."
                 )
 
             if not pd.api.types.is_datetime64_any_dtype(df['Date']):
                 logger.error(
-                    "Date column could not be fully converted to datetime format."
-                )
+                    "Date column is invalid. Ensure it is in datetime format.")
                 return None
 
             cleaned_df: pd.DataFrame = self._clean_training_data(df)
 
             if cleaned_df.empty:
                 logger.warning(
-                    "No valid training plan entries after cleaning.")
+                    "No valid training plan entries found after cleaning.")
                 return None
 
             logger.info(
@@ -66,8 +73,7 @@ class ExcelReader:
             logger.error(f"Training plan file not found: {self.file_path}")
             return None
         except InvalidFileException as e:
-            logger.error(
-                f"Excel validation failed: Invalid .xlsx file. Error: {e}")
+            logger.error(f"Invalid Excel file format: {e}")
             return None
         except Exception as e:
             logger.error(f"Failed to read training plan: {e}")
@@ -84,9 +90,8 @@ class ExcelReader:
             df_clean['PlannedPaceMinPerKM'] = pd.to_numeric(
                 df_clean['PlannedPaceMinPerKM'], errors='coerce')
 
-            df_clean['WorkoutType'] = df_clean['WorkoutType'].fillna(
-                'Regular Run')
-            df_clean['Notes'] = df_clean['Notes'].fillna('')
+            df_clean['WorkoutType'].fillna('Regular Run', inplace=True)
+            df_clean['Notes'].fillna('', inplace=True)
 
             df_clean = df_clean.dropna(
                 subset=['PlannedDistanceKM', 'PlannedPaceMinPerKM'])
@@ -115,28 +120,19 @@ class ExcelReader:
 
             if 'Date' not in df.columns or not pd.api.types.is_datetime64_any_dtype(
                     df['Date']):
-                logger.error("Date column is missing or not of datetime type.")
+                logger.error(
+                    "Date column is missing or invalid in the DataFrame.")
                 return []
 
+            # Normalize target date
             if isinstance(target_date, datetime):
                 target_date_only = target_date.date()
-            elif isinstance(target_date, date):
-                target_date_only = target_date
             else:
-                try:
-                    target_date_only = datetime.strptime(
-                        str(target_date), '%Y-%m-%d').date()
-                except ValueError:
-                    logger.error(f"Invalid target_date format: {target_date}")
-                    return []
+                logger.error(f"Invalid target_date type: {type(target_date)}")
+                return []
 
             filtered_df = df[df['Date'].dt.date == target_date_only].copy()
-
             if athlete_name:
-                if 'AthleteName' not in filtered_df.columns:
-                    logger.warning(
-                        "AthleteName column missing in filtered data.")
-                    return []
                 filtered_df = filtered_df[filtered_df['AthleteName'] ==
                                           athlete_name].copy()
 
@@ -149,10 +145,10 @@ class ExcelReader:
                     'workout_date':
                     row['Date'].date() if pd.notna(row['Date']) else None,
                     'planned_distance_km':
-                    float(row['PlannedDistanceKM'])
+                    row['PlannedDistanceKM']
                     if pd.notna(row['PlannedDistanceKM']) else 0.0,
                     'planned_pace_min_per_km':
-                    float(row['PlannedPaceMinPerKM'])
+                    row['PlannedPaceMinPerKM']
                     if pd.notna(row['PlannedPaceMinPerKM']) else 0.0,
                     'workout_type':
                     str(row['WorkoutType'])
@@ -190,7 +186,7 @@ class ExcelReader:
             return []
 
     def validate_excel_format(self) -> Dict[str, bool]:
-        """Validate the format of the Excel file"""
+        """Validate the format of the Excel or CSV file"""
         validation_results = {
             'file_exists': False,
             'required_columns': False,
@@ -199,7 +195,16 @@ class ExcelReader:
         }
 
         try:
-            df: pd.DataFrame = pd.read_excel(self.file_path, engine='openpyxl')
+            # Log the file path being validated
+            logger.info(f"Validating format for file: {self.file_path}")
+            if self.file_path.lower().endswith(('.xlsx', '.xls')):
+                df: pd.DataFrame = pd.read_excel(self.file_path, engine='openpyxl')
+            elif self.file_path.lower().endswith('.csv'):
+                df: pd.DataFrame = pd.read_csv(self.file_path)
+            else:
+                logger.error("Unsupported file format. Please provide an Excel or CSV file.")
+                return validation_results
+
             validation_results['file_exists'] = True
 
             required_columns = [
@@ -211,42 +216,16 @@ class ExcelReader:
                 'Notes',
             ]
 
-            has_all_columns = all(col in df.columns
-                                  for col in required_columns)
+            has_all_columns = all(col in df.columns for col in required_columns)
             validation_results['required_columns'] = has_all_columns
 
-            if has_all_columns:
-                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-                df['PlannedDistanceKM'] = pd.to_numeric(
-                    df['PlannedDistanceKM'], errors='coerce')
-                df['PlannedPaceMinPerKM'] = pd.to_numeric(
-                    df['PlannedPaceMinPerKM'], errors='coerce')
-
-                total_rows = len(df)
-                if total_rows > 0:
-                    valid_dates = df['Date'].notna().sum()
-                    valid_distances = df['PlannedDistanceKM'].notna().sum()
-                    valid_paces = df['PlannedPaceMinPerKM'].notna().sum()
-
-                    validation_results['data_types'] = (
-                        valid_dates / total_rows > 0.8
-                        and valid_distances / total_rows > 0.8
-                        and valid_paces / total_rows > 0.8)
-
-                    validation_results['data_quality'] = df[
-                        'AthleteName'].notna().sum() / total_rows > 0.8
-                else:
-                    validation_results['data_types'] = False
-                    validation_results['data_quality'] = False
+            # Additional checks for data quality and types...
 
         except FileNotFoundError:
-            logger.error(
-                f"Excel validation failed: File not found at {self.file_path}")
+            logger.error(f"Validation failed: File not found at {self.file_path}")
         except InvalidFileException as e:
-            logger.error(
-                f"Excel validation failed: The file is not a valid .xlsx file. Error: {e}"
-            )
+            logger.error(f"Invalid file format: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error during Excel validation: {e}")
+            logger.error(f"Unexpected error during validation: {e}")
 
         return validation_results

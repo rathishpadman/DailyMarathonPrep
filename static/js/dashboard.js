@@ -650,12 +650,46 @@ function updateDashboardData(data) {
     // Implementation depends on specific UI elements that need updating
     console.log('Updating dashboard data:', data);
 
+    // Update dashboard tiles
+    updateDashboardTiles(data.period_stats);
+
     // Example: Update team summary cards
     updateTeamSummaryCards(data.team_summary);
 
     // Example: Update charts
     if (data.weekly_trends) {
         updateWeeklyTrendsChart(data.weekly_trends);
+    }
+}
+
+/**
+ * Update dashboard tiles with filtered data
+ */
+function updateDashboardTiles(periodStats) {
+    if (!periodStats) return;
+
+    // Update total athletes
+    const totalAthletesElement = document.getElementById('tile-total-athletes');
+    if (totalAthletesElement) {
+        totalAthletesElement.textContent = periodStats.total_athletes || 0;
+    }
+
+    // Update total planned
+    const totalPlannedElement = document.getElementById('tile-total-planned');
+    if (totalPlannedElement) {
+        totalPlannedElement.textContent = `${(periodStats.total_planned || 0).toFixed(1)} km`;
+    }
+
+    // Update total actual
+    const totalActualElement = document.getElementById('tile-total-actual');
+    if (totalActualElement) {
+        totalActualElement.textContent = `${(periodStats.total_actual || 0).toFixed(1)} km`;
+    }
+
+    // Update completion rate
+    const completionRateElement = document.getElementById('tile-completion-rate');
+    if (completionRateElement) {
+        completionRateElement.textContent = `${(periodStats.completion_rate || 0).toFixed(1)}%`;
     }
 }
 

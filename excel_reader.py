@@ -48,7 +48,16 @@ class ExcelReader:
                 )
                 return None
 
-            df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
+            # Enhanced date parsing to handle multiple formats
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce', format='%d/%m/%Y')
+            if df['Date'].isna().any():
+                # Try different date formats
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce', format='%m/%d/%Y')
+            if df['Date'].isna().any():
+                # Try ISO format
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            
+            logger.info(f"Date range in training plan: {df['Date'].min()} to {df['Date'].max()}")
 
             if df['Date'].isna().any():
                 logger.warning(

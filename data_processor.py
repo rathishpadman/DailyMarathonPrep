@@ -111,6 +111,13 @@ class DataProcessor:
                     Activity.start_date < end_of_day
                 )
             ).distinct().all()
+            
+            # Debug logging for date comparison
+            logger.debug(f"Processing athlete {athlete_id} for date {target_date_only}")
+            logger.debug(f"Planned workout found: {planned_workout is not None}")
+            if planned_workout:
+                logger.debug(f"Planned distance: {planned_workout.planned_distance_km}")
+            logger.debug(f"Activities found: {len(activities)}")
 
             # FIX: Log the number of activities found for debugging
             logger.debug(f"Found {len(activities)} activities for athlete {athlete_id} on {target_date_only}")

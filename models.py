@@ -77,6 +77,15 @@ class DailySummary(db.Model):
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+
+    # Add indexes for better query performance
+    __table_args__ = (
+        UniqueConstraint('athlete_id', 'summary_date', name='uq_daily_summary_athlete_date'),
+        db.Index('idx_daily_summary_date', 'summary_date'),
+        db.Index('idx_daily_summary_athlete', 'athlete_id'),
+        db.Index('idx_daily_summary_status', 'status')
+    )
+
     # This is the KEY change: Ensure only one summary per athlete per day
     __table_args__ = (UniqueConstraint('athlete_id', 'summary_date', name='uq_daily_summary_athlete_date'),)
     

@@ -16,81 +16,232 @@ logger = logging.getLogger(__name__)
 
 @app.route('/')
 def index():
-    """Home page with overview and quick stats"""
+    """Simplified home page with 4 tiles, athlete management, and summary table"""
     try:
-        # Get basic stats - only count distinct active athletes
-        total_athletes = db.session.query(func.count(distinct(
-            Athlete.id))).filter_by(is_active=True).scalar()
-
-        # Get recent activities (last 7 days) - avoid duplicates
+        # Get the 4 main tiles data
+        total_athletes = db.session.query(func.count(distinct(Athlete.id))).filter_by(is_active=True).scalar()
+        
+        # Weekly stats (last 7 days)
         week_ago = datetime.now() - timedelta(days=7)
-        recent_activities = db.session.query(func.count(distinct(
-            Activity.id))).filter(Activity.start_date >= week_ago).scalar()
-
-        # Get latest system log
-        latest_log = SystemLog.query.order_by(
-            SystemLog.created_at.desc()).first()
-
-        # Get recent daily summaries - avoid duplicates by athlete and date
-        recent_summaries = db.session.query(DailySummary).filter(
-            DailySummary.summary_date >= week_ago.date()).order_by(
-                DailySummary.summary_date.desc(),
-                DailySummary.athlete_id).limit(10).all()
-
+        weekly_activities = db.session.query(func.count(distinct(Activity.id))).filter(Activity.start_date >= week_ago).scalar()
+        
+        # Monthly stats (last 30 days)
+        month_ago = datetime.now() - timedelta(days=30)
+        monthly_activities = db.session.query(func.count(distinct(Activity.id))).filter(Activity.start_date >= month_ago).scalar()
+        
+        # Total planned vs actual distance this week
+        weekly_summaries = db.session.query(DailySummary).filter(
+            DailySummary.summary_date >= week_ago.date()
+        ).all()
+        
+        weekly_planned = sum(s.planned_distance_km or 0 for s in weekly_summaries)
+        weekly_actual = sum(s.actual_distance_km or 0 for s in weekly_summaries)
+        
+        # Get all athletes for management
+        all_athletes = db.session.query(Athlete).order_by(Athlete.name).all()
+        
+        # Get unified summary data with filtering support
+        filter_period = request.args.get('period', 'week')  # day, week, month
+        summary_data = get_filtered_summary_data(filter_period)
+        
         return render_template('index.html',
                                total_athletes=total_athletes,
-                               recent_activities=recent_activities,
-                               latest_log=latest_log,
-                               recent_summaries=recent_summaries)
+                               weekly_activities=weekly_activities,
+
+def get_filtered_summary_data(period='week'):
+    """Get summary data filtered by period with aggregated planned vs actual"""
+    try:
+        end_date = datetime.now()
+        
+        if period == 'day':
+            start_date = end_date - timedelta(days=1)
+            group_by_format = '%Y-%m-%d'
+        elif period == 'month':
+            start_date = end_date - timedelta(days=30)
+            group_by_format = '%Y-%m-%d'
+        else:  # week
+            start_date = end_date - timedelta(days=7)
+            group_by_format = '%Y-%m-%d'
+        
+        # Get summaries for the period
+        summaries = db.session.query(DailySummary).filter(
+            DailySummary.summary_date >= start_date.date(),
+            DailySummary.summary_date <= end_date.date()
+        ).order_by(DailySummary.summary_date.desc()).all()
+        
+        # Group by date and aggregate
+        date_groups = {}
+        for summary in summaries:
+            date_key = summary.summary_date.strftime(group_by_format)
+            if date_key not in date_groups:
+                date_groups[date_key] = {
+                    'date': summary.summary_date,
+                    'athletes': [],
+                    'total_planned': 0,
+                    'total_actual': 0,
+                    'completion_rate': 0
+                }
+            
+            athlete = Athlete.query.get(summary.athlete_id)
+            date_groups[date_key]['athletes'].append({
+                'name': athlete.name if athlete else 'Unknown',
+                'planned': summary.planned_distance_km or 0,
+                'actual': summary.actual_distance_km or 0,
+                'status': summary.status
+            })
+            date_groups[date_key]['total_planned'] += summary.planned_distance_km or 0
+            date_groups[date_key]['total_actual'] += summary.actual_distance_km or 0
+        
+        # Calculate completion rates
+        for date_data in date_groups.values():
+            completed = len([a for a in date_data['athletes'] if a['status'] in ['On Track', 'Over-performed']])
+            total = len(date_data['athletes'])
+            date_data['completion_rate'] = (completed / total * 100) if total > 0 else 0
+        
+        return list(date_groups.values())
+        
+    except Exception as e:
+        logger.error(f"Error getting filtered summary data: {e}")
+        return []
+
+
+                               monthly_activities=monthly_activities,
+                               weekly_planned=weekly_planned,
+                               weekly_actual=weekly_actual,
+                               all_athletes=all_athletes,
+                               summary_data=summary_data,
+                               current_period=filter_period)
 
     except Exception as e:
         logger.error(f"Error loading home page: {e}")
         flash(f"Error loading dashboard: {e}", "error")
         return render_template('index.html',
                                total_athletes=0,
-                               recent_activities=0,
-                               latest_log=None,
-                               recent_summaries=[])
+                               weekly_activities=0,
+                               monthly_activities=0,
+                               weekly_planned=0,
+                               weekly_actual=0,
+                               all_athletes=[],
+                               summary_data=[],
+                               current_period='week')
 
 
 @app.route('/dashboard')
-@app.route('/dashboard/<date>')
-def dashboard(date=None):
-    """Main dashboard view for a specific date"""
+def dashboard():
+    """Enhanced dashboard with comprehensive filtering and manual update capabilities"""
     try:
-        # Parse target date - FIX: Use current date instead of yesterday as default
-        if date:
-            target_date = datetime.strptime(date, '%Y-%m-%d')
+        # Get filter parameters
+        athlete_filter = request.args.get('athlete_id', type=int)
+        date_filter = request.args.get('date')
+        period_filter = request.args.get('period', 'week')  # day, week, month
+        activity_filter = request.args.get('activity_type', 'all')
+        
+        # Parse target date
+        if date_filter:
+            target_date = datetime.strptime(date_filter, '%Y-%m-%d')
         else:
-            target_date = datetime.now().replace(
-                hour=0, minute=0, second=0,
-                microsecond=0)  # Today, not yesterday
+            target_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-        # Build dashboard data
-        dashboard_builder = DashboardBuilder()
-        dashboard_data = dashboard_builder.build_daily_dashboard(target_date)
+        # Get all athletes for filter dropdown
+        all_athletes = db.session.query(Athlete).filter_by(is_active=True).order_by(Athlete.name).all()
+        
+        # Build filtered dashboard data
+        dashboard_data = get_enhanced_dashboard_data(
 
+def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter='week', activity_filter='all'):
+    """Get enhanced dashboard data with comprehensive filtering"""
+    try:
+        # Determine date range based on period
+        if period_filter == 'day':
+            start_date = target_date
+            end_date = target_date
+        elif period_filter == 'month':
+            start_date = target_date.replace(day=1)
+            next_month = start_date.replace(month=start_date.month + 1) if start_date.month < 12 else start_date.replace(year=start_date.year + 1, month=1)
+            end_date = next_month - timedelta(days=1)
+        else:  # week
+            start_date = target_date - timedelta(days=target_date.weekday())
+            end_date = start_date + timedelta(days=6)
+        
+        # Build query with filters
+        query = db.session.query(DailySummary).filter(
+            DailySummary.summary_date >= start_date.date(),
+            DailySummary.summary_date <= end_date.date()
+        )
+        
+        if athlete_filter:
+            query = query.filter(DailySummary.athlete_id == athlete_filter)
+        
+        summaries = query.order_by(DailySummary.summary_date.desc()).all()
+        
+        # Process summaries with athlete information
+        enhanced_summaries = []
+        total_planned = 0
+        total_actual = 0
+        
+        for summary in summaries:
+            athlete = Athlete.query.get(summary.athlete_id)
+            if not athlete:
+                continue
+                
+            # Apply activity filter if needed (for future enhancement)
+            summary_data = {
+                'athlete_id': summary.athlete_id,
+                'athlete_name': athlete.name,
+                'date': summary.summary_date,
+                'planned_distance': summary.planned_distance_km or 0,
+                'actual_distance': summary.actual_distance_km or 0,
+                'planned_pace': summary.planned_pace_min_per_km or 0,
+                'actual_pace': summary.actual_pace_min_per_km or 0,
+                'distance_variance': summary.distance_variance_percent or 0,
+                'pace_variance': summary.pace_variance_percent or 0,
+                'status': summary.status,
+                'notes': summary.notes
+            }
+            enhanced_summaries.append(summary_data)
+            total_planned += summary.planned_distance_km or 0
+            total_actual += summary.actual_distance_km or 0
+        
+        # Calculate aggregate statistics
+        variance = ((total_actual - total_planned) / total_planned * 100) if total_planned > 0 else 0
+        completion_rate = len([s for s in enhanced_summaries if s['status'] in ['On Track', 'Over-performed']]) / len(enhanced_summaries) * 100 if enhanced_summaries else 0
+        
+        return {
+            'summaries': enhanced_summaries,
+            'period_stats': {
+                'start_date': start_date.date(),
+                'end_date': end_date.date(),
+                'total_planned': total_planned,
+                'total_actual': total_actual,
+                'variance_percent': variance,
+                'completion_rate': completion_rate,
+                'total_athletes': len(set(s['athlete_id'] for s in enhanced_summaries))
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting enhanced dashboard data: {e}")
+        return {'summaries': [], 'period_stats': {}}
+
+
+            target_date, athlete_filter, period_filter, activity_filter
+        )
+        
         # Get weekly trends
+        dashboard_builder = DashboardBuilder()
         weekly_trends = dashboard_builder.get_weekly_trends(target_date)
-
-        # FIX: Trigger sync for current date if it's today
-        if target_date.date() == datetime.now().date():
-            try:
-                # Auto-sync current day activities
-                success = run_manual_task(target_date)
-                if success:
-                    logger.info(
-                        f"Auto-synced activities for {target_date.date()}")
-                    # Rebuild dashboard data after sync
-                    dashboard_data = dashboard_builder.build_daily_dashboard(
-                        target_date)
-            except Exception as sync_error:
-                logger.warning(f"Auto-sync failed: {sync_error}")
 
         return render_template('dashboard.html',
                                dashboard_data=dashboard_data,
                                weekly_trends=weekly_trends,
-                               target_date=target_date)
+                               target_date=target_date,
+                               all_athletes=all_athletes,
+                               filters={
+                                   'athlete_id': athlete_filter,
+                                   'date': date_filter,
+                                   'period': period_filter,
+                                   'activity_type': activity_filter
+                               })
 
     except Exception as e:
         logger.error(f"Error loading dashboard: {e}")
@@ -246,6 +397,44 @@ def manual_run():
             # FIX: Default to current date for syncing, not yesterday
             target_date = datetime.now().replace(hour=0,
                                                  minute=0,
+
+@app.route('/api/manual-update-athlete', methods=['POST'])
+def manual_update_athlete():
+    """API endpoint to manually update a specific athlete for a specific date"""
+    try:
+        data = request.get_json()
+        athlete_id = data.get('athlete_id')
+        target_date_str = data.get('date')
+        
+        if not athlete_id or not target_date_str:
+            return jsonify({"success": False, "message": "Missing athlete_id or date"})
+        
+        target_date = datetime.strptime(target_date_str, '%Y-%m-%d')
+        athlete = Athlete.query.get(athlete_id)
+        
+        if not athlete:
+            return jsonify({"success": False, "message": "Athlete not found"})
+        
+        # Process single athlete for specific date
+        from data_processor import DataProcessor
+        data_processor = DataProcessor()
+        
+        performance_summary = data_processor.process_athlete_daily_performance(athlete_id, target_date)
+        
+        if performance_summary:
+            success = data_processor.save_daily_summary(performance_summary)
+            if success:
+                message = f"Successfully updated {athlete.name} for {target_date_str}"
+                return jsonify({"success": True, "message": message})
+        
+        return jsonify({"success": False, "message": "Failed to update athlete data"})
+        
+    except Exception as e:
+        error_msg = f"Error during manual athlete update: {e}"
+        logger.error(error_msg)
+        return jsonify({"success": False, "message": error_msg})
+
+
                                                  second=0,
                                                  microsecond=0)
 
@@ -308,6 +497,32 @@ def strava_callback():
 
         # Get or create athlete
         athlete_info = token_data.get('athlete', {})
+
+@app.route('/api/summary-stats/<period>')
+def api_summary_stats(period):
+    """API endpoint for real-time summary statistics"""
+    try:
+        summary_data = get_filtered_summary_data(period)
+        
+        # Calculate totals
+        total_planned = sum(day['total_planned'] for day in summary_data)
+        total_actual = sum(day['total_actual'] for day in summary_data)
+        avg_completion = sum(day['completion_rate'] for day in summary_data) / len(summary_data) if summary_data else 0
+        
+        return jsonify({
+            'period': period,
+            'total_planned': total_planned,
+            'total_actual': total_actual,
+            'variance_percent': ((total_actual - total_planned) / total_planned * 100) if total_planned > 0 else 0,
+            'avg_completion_rate': avg_completion,
+            'data_points': len(summary_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting summary stats: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
         strava_athlete_id = athlete_info.get('id')
         athlete_name = f"{athlete_info.get('firstname', '')} {athlete_info.get('lastname', '')}".strip(
         )

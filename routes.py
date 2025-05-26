@@ -395,44 +395,6 @@ def manual_run():
             # FIX: Default to current date for syncing, not yesterday
             target_date = datetime.now().replace(hour=0,
                                                  minute=0,
-
-@app.route('/api/manual-update-athlete', methods=['POST'])
-def manual_update_athlete():
-    """API endpoint to manually update a specific athlete for a specific date"""
-    try:
-        data = request.get_json()
-        athlete_id = data.get('athlete_id')
-        target_date_str = data.get('date')
-
-        if not athlete_id or not target_date_str:
-            return jsonify({"success": False, "message": "Missing athlete_id or date"})
-
-        target_date = datetime.strptime(target_date_str, '%Y-%m-%d')
-        athlete = Athlete.query.get(athlete_id)
-
-        if not athlete:
-            return jsonify({"success": False, "message": "Athlete not found"})
-
-        # Process single athlete for specific date
-        from data_processor import DataProcessor
-        data_processor = DataProcessor()
-
-        performance_summary = data_processor.process_athlete_daily_performance(athlete_id, target_date)
-
-        if performance_summary:
-            success = data_processor.save_daily_summary(performance_summary)
-            if success:
-                message = f"Successfully updated {athlete.name} for {target_date_str}"
-                return jsonify({"success": True, "message": message})
-
-        return jsonify({"success": False, "message": "Failed to update athlete data"})
-
-    except Exception as e:
-        error_msg = f"Error during manual athlete update: {e}"
-        logger.error(error_msg)
-        return jsonify({"success": False, "message": error_msg})
-
-
                                                  second=0,
                                                  microsecond=0)
 

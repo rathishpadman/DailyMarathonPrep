@@ -91,12 +91,13 @@ def get_filtered_summary_data(period='week'):
         end_date = datetime.now()
         
         if period == 'day':
-            # Get latest 10 days
-            summaries = db.session.query(DailySummary).filter(
-                DailySummary.summary_date <= end_date.date()
-            ).order_by(DailySummary.summary_date.desc()).limit(10 * 10).all()  # 10 days * max athletes
+            # Get latest 10 days with distinct athlete summaries
+            summaries = db.session.query(DailySummary).join(Athlete).filter(
+                DailySummary.summary_date <= end_date.date(),
+                Athlete.is_active == True
+            ).order_by(DailySummary.summary_date.desc()).limit(10 * 10).all()
             
-            # Group by individual dates
+            # Group by individual dates with unique athletes
             date_groups = {}
             for summary in summaries:
                 date_key = summary.summary_date.strftime('%Y-%m-%d')
@@ -105,24 +106,32 @@ def get_filtered_summary_data(period='week'):
                         'date': summary.summary_date,
                         'period_label': summary.summary_date.strftime('%d %b %Y'),
                         'athletes': [],
+                        'athlete_ids': set(),  # Track unique athlete IDs
                         'total_planned': 0,
                         'total_actual': 0,
                         'completion_rate': 0
                     }
 
-                athlete = Athlete.query.get(summary.athlete_id)
-                date_groups[date_key]['athletes'].append({
-                    'name': athlete.name if athlete else 'Unknown',
-                    'planned': summary.planned_distance_km or 0,
-                    'actual': summary.actual_distance_km or 0,
-                    'status': summary.status
-                })
-                date_groups[date_key]['total_planned'] += summary.planned_distance_km or 0
-                date_groups[date_key]['total_actual'] += summary.actual_distance_km or 0
+                # Only add if athlete hasn't been added for this date
+                if summary.athlete_id not in date_groups[date_key]['athlete_ids']:
+                    athlete = Athlete.query.get(summary.athlete_id)
+                    date_groups[date_key]['athletes'].append({
+                        'name': athlete.name if athlete else 'Unknown',
+                        'planned': summary.planned_distance_km or 0,
+                        'actual': summary.actual_distance_km or 0,
+                        'status': summary.status
+                    })
+                    date_groups[date_key]['athlete_ids'].add(summary.athlete_id)
+                    date_groups[date_key]['total_planned'] += summary.planned_distance_km or 0
+                    date_groups[date_key]['total_actual'] += summary.actual_distance_km or 0
             
-            # Get latest 10 unique dates
+            # Clean up athlete_ids from final data and get latest 10 unique dates
             sorted_dates = sorted(date_groups.keys(), reverse=True)[:10]
-            result_data = [date_groups[date] for date in sorted_dates]
+            result_data = []
+            for date in sorted_dates:
+                data = date_groups[date]
+                data.pop('athlete_ids', None)  # Remove tracking set
+                result_data.append(data)
             
         elif period == 'week':
             # Define week start as May 19, 2025 (Week 1)
@@ -280,12 +289,33 @@ def dashboard():
         # Get filter parameters
         athlete_filter = request.args.get('athlete_id', type=int)
         date_filter = request.args.get('date')
-        period_filter = request.args.get('period', 'week')  # day, week, month
+        period_filter = request.args.get('period', 'day')  # day, week, month
         activity_filter = request.args.get('activity_type', 'all')
+        week_filter = request.args.get('week')
+        month_filter = request.args.get('month')
+        start_date_filter = request.args.get('start_date')
+        end_date_filter = request.args.get('end_date')
 
-        # Parse target date
-        if date_filter:
-            target_date = datetime.strptime(date_filter, '%Y-%m-%d')
+        # Parse target date based on period and filters
+        if period_filter == 'day':
+            if start_date_filter:
+                target_date = datetime.strptime(start_date_filter, '%Y-%m-%d')
+            else:
+                target_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period_filter == 'week' and week_filter:
+            # Parse week (e.g., "week-1" -> Week 1 starting May 19)
+            week_num = int(week_filter.split('-')[1]) - 1
+            base_date = datetime(2025, 5, 19)  # Week 1 starts May 19
+            target_date = base_date + timedelta(weeks=week_num)
+        elif period_filter == 'month' and month_filter:
+            # Parse month (e.g., "may-25" -> May 2025)
+            month_name, year_suffix = month_filter.split('-')
+            month_num = {
+                'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+                'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+            }.get(month_name.lower(), 5)
+            year = 2000 + int(year_suffix)
+            target_date = datetime(year, month_num, 1)
         else:
             target_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -294,7 +324,8 @@ def dashboard():
 
         # Build filtered dashboard data
         dashboard_data = get_enhanced_dashboard_data(
-            target_date, athlete_filter, period_filter, activity_filter
+            target_date, athlete_filter, period_filter, activity_filter,
+            start_date_filter, end_date_filter
         )
 
         # Get weekly trends
@@ -310,7 +341,11 @@ def dashboard():
                                    'athlete_id': athlete_filter,
                                    'date': date_filter,
                                    'period': period_filter,
-                                   'activity_type': activity_filter
+                                   'activity_type': activity_filter,
+                                   'week': week_filter,
+                                   'month': month_filter,
+                                   'start_date': start_date_filter,
+                                   'end_date': end_date_filter
                                })
 
     except Exception as e:
@@ -319,25 +354,34 @@ def dashboard():
         return redirect(url_for('index'))
 
 
-def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter='week', activity_filter='all'):
+def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter='day', activity_filter='all', 
+                                       start_date_filter=None, end_date_filter=None):
     """Get enhanced dashboard data with comprehensive filtering"""
     try:
         # Determine date range based on period
         if period_filter == 'day':
-            start_date = target_date
-            end_date = target_date
+            if start_date_filter and end_date_filter:
+                start_date = datetime.strptime(start_date_filter, '%Y-%m-%d')
+                end_date = datetime.strptime(end_date_filter, '%Y-%m-%d')
+            else:
+                start_date = target_date
+                end_date = target_date
         elif period_filter == 'month':
             start_date = target_date.replace(day=1)
-            next_month = start_date.replace(month=start_date.month + 1) if start_date.month < 12 else start_date.replace(year=start_date.year + 1, month=1)
+            if target_date.month == 12:
+                next_month = start_date.replace(year=start_date.year + 1, month=1)
+            else:
+                next_month = start_date.replace(month=start_date.month + 1)
             end_date = next_month - timedelta(days=1)
         else:  # week
             start_date = target_date - timedelta(days=target_date.weekday())
             end_date = start_date + timedelta(days=6)
 
-        # Build query with filters
-        query = db.session.query(DailySummary).filter(
+        # Build query with filters - join with Athlete to ensure active athletes only
+        query = db.session.query(DailySummary).join(Athlete).filter(
             DailySummary.summary_date >= start_date.date(),
-            DailySummary.summary_date <= end_date.date()
+            DailySummary.summary_date <= end_date.date(),
+            Athlete.is_active == True
         )
 
         if athlete_filter:

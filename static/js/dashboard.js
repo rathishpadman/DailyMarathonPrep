@@ -19,9 +19,6 @@ function initializeDashboard() {
     // Initialize any existing charts
     initializeCharts();
 
-    // Setup auto-refresh for live data (optional)
-    // setupAutoRefresh();
-
     // Initialize tooltips and popovers
     initializeBootstrapComponents();
 }
@@ -39,6 +36,16 @@ function initializeFeatherIcons() {
  * Setup event listeners
  */
 function setupEventListeners() {
+    // Handle period filter changes for summary table
+    const periodButtons = document.querySelectorAll('.period-filter');
+    periodButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const period = this.getAttribute('data-period');
+            updateSummaryData(period);
+        });
+    });
+
     // Handle manual sync button clicks
     const manualSyncButtons = document.querySelectorAll('[onclick*="runManualTask"]');
     manualSyncButtons.forEach(button => {
@@ -64,6 +71,136 @@ function setupEventListeners() {
         dateSelector.addEventListener('change', function() {
             changeDashboardDate(this.value);
         });
+    }
+}
+
+/**
+ * Update summary data via AJAX
+ */
+function updateSummaryData(period) {
+    // Show loading state
+    const summaryTableContainer = document.getElementById('summaryTableContainer');
+    if (summaryTableContainer) {
+        summaryTableContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+    }
+
+    // Update active button state
+    const periodButtons = document.querySelectorAll('.period-filter');
+    periodButtons.forEach(btn => {
+        const btnElement = btn.closest('button');
+        if (btnElement && btnElement.classList) {
+            btnElement.classList.remove('active');
+        }
+    });
+
+    const activeButton = document.querySelector(`[data-period="${period}"]`);
+    if (activeButton && activeButton.closest('button') && activeButton.closest('button').classList) {
+        activeButton.closest('button').classList.add('active');
+    }
+
+    // Fetch updated summary data
+    fetch(`/api/summary-stats/${period}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // Update summary table
+            updateSummaryTable(data.summary_data, period);
+
+            // Update stats if elements exist
+            updateSummaryStats(data);
+        })
+        .catch(error => {
+            console.error('Error fetching summary data:', error);
+            if (summaryTableContainer) {
+                summaryTableContainer.innerHTML = `<div class="alert alert-danger">Error loading data: ${error.message}</div>`;
+            }
+        });
+}
+
+/**
+ * Update summary table with new data
+ */
+function updateSummaryTable(summaryData, period) {
+    const tableContainer = document.getElementById('summaryTableContainer');
+    if (!tableContainer) return;
+
+    if (!summaryData || summaryData.length === 0) {
+        tableContainer.innerHTML = '<div class="text-center p-4"><p class="text-muted">No data available for the selected period.</p></div>';
+        return;
+    }
+
+    let tableHtml = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        <th>Total Planned (km)</th>
+                        <th>Total Actual (km)</th>
+                        <th>Variance</th>
+                        <th>Completion Rate</th>
+                        <th>Athletes</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    summaryData.forEach(item => {
+        const variance = item.total_planned > 0 ? 
+            ((item.total_actual - item.total_planned) / item.total_planned * 100).toFixed(1) : 0;
+
+        tableHtml += `
+            <tr>
+                <td>${item.period_label}</td>
+                <td>${item.total_planned.toFixed(1)} km</td>
+                <td>${item.total_actual.toFixed(1)} km</td>
+                <td><span class="${variance >= 0 ? 'text-success' : 'text-danger'}">${variance >= 0 ? '+' : ''}${variance}%</span></td>
+                <td>${item.completion_rate.toFixed(1)}%</td>
+                <td>${item.athletes ? item.athletes.length : 0}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += '</tbody></table></div>';
+    tableContainer.innerHTML = tableHtml;
+}
+
+/**
+ * Update summary statistics
+ */
+function updateSummaryStats(data) {
+    // Update total planned
+    const totalPlannedElement = document.querySelector('[data-stat="total-planned"]');
+    if (totalPlannedElement) {
+        totalPlannedElement.textContent = `${data.total_planned.toFixed(1)} km`;
+    }
+
+    // Update total actual
+    const totalActualElement = document.querySelector('[data-stat="total-actual"]');
+    if (totalActualElement) {
+        totalActualElement.textContent = `${data.total_actual.toFixed(1)} km`;
+    }
+
+    // Update variance
+    const varianceElement = document.querySelector('[data-stat="variance"]');
+    if (varianceElement) {
+        const variance = data.variance_percent;
+        varianceElement.textContent = `${variance >= 0 ? '+' : ''}${variance.toFixed(1)}%`;
+        varianceElement.className = variance >= 0 ? 'text-success' : 'text-danger';
+    }
+
+    // Update completion rate
+    const completionElement = document.querySelector('[data-stat="completion"]');
+    if (completionElement) {
+        completionElement.textContent = `${data.avg_completion_rate.toFixed(1)}%`;
     }
 }
 
@@ -604,6 +741,7 @@ window.DashboardApp = {
     formatDistance,
     formatVariance,
     getStatusBadgeClass,
+    updateSummaryData,
     createWeeklyTrendsChart,
     createStatusBreakdownChart
 };

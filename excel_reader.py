@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from config import Config
 from openpyxl.utils.exceptions import InvalidFileException
+from column_mapping_config import get_column_mapping, validate_required_columns, STANDARD_COLUMNS
 
 logger = logging.getLogger(__name__)
 
@@ -319,38 +320,17 @@ class ExcelReader:
                 logger.warning("File is empty")
                 return []
 
-            # Create flexible column mapping
-            column_mapping = {}
+            # Use the column mapping configuration
             actual_columns = df.columns.tolist()
+            column_mapping = get_column_mapping(actual_columns)
             
-            # Map required columns with flexible matching
-            required_mappings = {
-                'Date': ['date', 'workout_date', 'training_date'],
-                'AthleteName': ['athletename', 'athlete_name', 'athlete', 'name'],
-                'PlannedDistanceKM': ['planneddistancekm', 'planned_distance_km', 'distance_km', 'distance'],
-                'PlannedPaceMinPerKM': ['plannedpaceminperkm', 'planned_pace_min_per_km', 'pace_min_per_km', 'pace'],
-                'WorkoutType': ['workouttype', 'workout_type', 'type'],
-                'Notes': ['notes', 'note', 'description']
-            }
-
-            for standard_col, possible_names in required_mappings.items():
-                column_mapping[standard_col] = None
-                for actual_col in actual_columns:
-                    if actual_col == standard_col:  # Exact match first
-                        column_mapping[standard_col] = actual_col
-                        break
-                    # Then try fuzzy matching
-                    for possible_name in possible_names:
-                        if possible_name.lower() in actual_col.lower():
-                            column_mapping[standard_col] = actual_col
-                            break
-                    if column_mapping[standard_col]:
-                        break
-
-            # Check if we have essential columns
-            if not column_mapping.get('Date') or not column_mapping.get('AthleteName'):
-                logger.error(f"Missing essential columns. Available: {actual_columns}")
+            # Validate that required columns are mapped
+            is_valid, missing_columns = validate_required_columns(column_mapping)
+            if not is_valid:
+                logger.error(f"Missing essential columns: {missing_columns}. Available: {actual_columns}")
                 return []
+
+            logger.info(f"Column mapping: {column_mapping}")
 
             planned_workouts = []
 

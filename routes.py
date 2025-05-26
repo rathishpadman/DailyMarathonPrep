@@ -972,6 +972,163 @@ def debug_km_mismatch(athlete_id, date):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/debug/comprehensive/<int:athlete_id>/<date>')
+def debug_comprehensive(athlete_id, date):
+    """Comprehensive debug route for planned vs actual KM analysis"""
+    try:
+        target_date = datetime.strptime(date, '%Y-%m-%d').date()
+        athlete = Athlete.query.get(athlete_id)
+        
+        if not athlete:
+            return jsonify({'error': 'Athlete not found'}), 404
+        
+        # Get all planned workouts for this athlete
+        all_planned = db.session.query(PlannedWorkout).filter_by(athlete_id=athlete_id).all()
+        
+        # Get all activities for this athlete
+        all_activities = db.session.query(Activity).filter_by(athlete_id=athlete_id).all()
+        
+        # Get all daily summaries for this athlete
+        all_summaries = db.session.query(DailySummary).filter_by(athlete_id=athlete_id).all()
+        
+        # Focus on specific date
+        planned_workout = db.session.query(PlannedWorkout).filter(
+            and_(
+                PlannedWorkout.athlete_id == athlete_id,
+                func.date(PlannedWorkout.workout_date) == target_date
+            )
+        ).first()
+        
+        start_of_day = datetime.combine(target_date, datetime.min.time())
+        end_of_day = start_of_day + timedelta(days=1)
+        
+        activities = db.session.query(Activity).filter(
+            and_(
+                Activity.athlete_id == athlete_id,
+                Activity.start_date >= start_of_day,
+                Activity.start_date < end_of_day
+            )
+        ).all()
+        
+        daily_summary = db.session.query(DailySummary).filter_by(
+            athlete_id=athlete_id,
+            summary_date=target_date
+        ).first()
+        
+        # Check for data processing issues
+        from data_processor import DataProcessor
+        processor = DataProcessor()
+        
+        # Manually process the data to see what happens
+        manual_processing = processor.process_athlete_daily_performance(athlete_id, target_date)
+        
+        debug_info = {
+            'athlete_info': {
+                'id': athlete.id,
+                'name': athlete.name,
+                'is_active': athlete.is_active,
+                'strava_athlete_id': athlete.strava_athlete_id,
+                'has_refresh_token': athlete.refresh_token is not None
+            },
+            'date_analysis': {
+                'target_date': target_date.isoformat(),
+                'start_of_day': start_of_day.isoformat(),
+                'end_of_day': end_of_day.isoformat()
+            },
+            'planned_workout_for_date': {
+                'found': planned_workout is not None,
+                'data': {
+                    'id': planned_workout.id,
+                    'workout_date': planned_workout.workout_date.isoformat() if hasattr(planned_workout.workout_date, 'isoformat') else str(planned_workout.workout_date),
+                    'planned_distance_km': planned_workout.planned_distance_km,
+                    'planned_pace_min_per_km': planned_workout.planned_pace_min_per_km,
+                    'workout_type': planned_workout.workout_type,
+                    'notes': planned_workout.notes
+                } if planned_workout else None
+            },
+            'activities_for_date': {
+                'count': len(activities),
+                'total_distance': sum(a.distance_km or 0 for a in activities),
+                'activities': [
+                    {
+                        'id': activity.id,
+                        'name': activity.name,
+                        'start_date': activity.start_date.isoformat(),
+                        'distance_km': activity.distance_km,
+                        'pace_min_per_km': activity.pace_min_per_km,
+                        'activity_type': activity.activity_type
+                    } for activity in activities
+                ]
+            },
+            'daily_summary_for_date': {
+                'found': daily_summary is not None,
+                'data': {
+                    'id': daily_summary.id,
+                    'summary_date': daily_summary.summary_date.isoformat() if hasattr(daily_summary.summary_date, 'isoformat') else str(daily_summary.summary_date),
+                    'planned_distance_km': daily_summary.planned_distance_km,
+                    'actual_distance_km': daily_summary.actual_distance_km,
+                    'planned_pace_min_per_km': daily_summary.planned_pace_min_per_km,
+                    'actual_pace_min_per_km': daily_summary.actual_pace_min_per_km,
+                    'distance_variance_percent': daily_summary.distance_variance_percent,
+                    'pace_variance_percent': daily_summary.pace_variance_percent,
+                    'status': daily_summary.status,
+                    'notes': daily_summary.notes
+                } if daily_summary else None
+            },
+            'manual_processing_result': manual_processing,
+            'all_data_counts': {
+                'total_planned_workouts': len(all_planned),
+                'total_activities': len(all_activities),
+                'total_daily_summaries': len(all_summaries)
+            },
+            'sample_data': {
+                'planned_workouts_sample': [
+                    {
+                        'date': p.workout_date.isoformat() if hasattr(p.workout_date, 'isoformat') else str(p.workout_date),
+                        'distance': p.planned_distance_km
+                    } for p in all_planned[:5]
+                ],
+                'activities_sample': [
+                    {
+                        'date': a.start_date.isoformat(),
+                        'distance': a.distance_km
+                    } for a in all_activities[:5]
+                ],
+                'summaries_sample': [
+                    {
+                        'date': s.summary_date.isoformat() if hasattr(s.summary_date, 'isoformat') else str(s.summary_date),
+                        'planned': s.planned_distance_km,
+                        'actual': s.actual_distance_km
+                    } for s in all_summaries[:5]
+                ]
+            }
+        }
+        
+        return jsonify(debug_info)
+        
+    except Exception as e:
+        logger.error(f"Error in comprehensive debug route: {e}")
+        return jsonify({'error': str(e), 'traceback': str(e)}), 500
+
+
+@app.route('/debug/athletes')
+def debug_athletes():
+    """Debug route to list all athletes with their IDs"""
+    try:
+        athletes = db.session.query(Athlete).all()
+        athlete_list = [
+            {
+                'id': a.id,
+                'name': a.name,
+                'is_active': a.is_active,
+                'has_strava_connection': a.refresh_token is not None
+            } for a in athletes
+        ]
+        return jsonify(athlete_list)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""

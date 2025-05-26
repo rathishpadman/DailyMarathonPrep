@@ -20,7 +20,7 @@ class Config:
     WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 
     # File Paths
-    TRAINING_PLAN_FILE = os.getenv("TRAINING_PLAN_FILE", "sample_training_plan.csv")
+    TRAINING_PLAN_FILE = os.getenv("TRAINING_PLAN_FILE", "uploaded_training_plan.csv")
 
     # Scheduling Configuration
     DAILY_EXECUTION_TIME = os.getenv("DAILY_EXECUTION_TIME", "08:00")  # 24-hour format

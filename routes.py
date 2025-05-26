@@ -385,36 +385,38 @@ def upload_training_plan():
 def manual_run():
     """API endpoint to manually trigger daily tasks"""
     try:
-        # Get target date from request
-        target_date_str = request.json.get(
-            'date') if request.is_json else request.form.get('date')
+        # Get target date from request with better error handling
+        target_date_str = None
+        if request.is_json and request.json:
+            target_date_str = request.json.get('date')
+        elif request.form:
+            target_date_str = request.form.get('date')
 
         if target_date_str:
-            target_date = datetime.strptime(target_date_str, '%Y-%m-%d')
+            try:
+                target_date = datetime.strptime(target_date_str, '%Y-%m-%d')
+            except ValueError as ve:
+                error_msg = f"Invalid date format: {target_date_str}. Use YYYY-MM-DD format."
+                logger.error(error_msg)
+                return jsonify({"success": False, "message": error_msg}), 400
         else:
-            # FIX: Default to current date for syncing, not yesterday
-            target_date = datetime.now().replace(hour=0,
-                                                 minute=0,
-                                                 second=0,
-                                                 microsecond=0)
+            # Default to current date for syncing
+            target_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
         # Run manual task
         success = run_manual_task(target_date)
 
         if success:
             message = f"Manual task execution completed successfully for {target_date.strftime('%Y-%m-%d')}"
-            flash(message, "success")
             return jsonify({"success": True, "message": message})
         else:
             message = f"Manual task execution failed for {target_date.strftime('%Y-%m-%d')}"
-            flash(message, "error")
-            return jsonify({"success": False, "message": message})
+            return jsonify({"success": False, "message": message}), 500
 
     except Exception as e:
-        error_msg = f"Error during manual execution: {e}"
+        error_msg = f"Error during manual execution: {str(e)}"
         logger.error(error_msg)
-        flash(error_msg, "error")
-        return jsonify({"success": False, "message": error_msg})
+        return jsonify({"success": False, "message": error_msg}), 500
 
 
 @app.route('/auth/strava')

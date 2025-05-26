@@ -15,13 +15,13 @@ document.addEventListener('DOMContentLoaded', function() {
  */
 function initializeDashboard() {
     console.log('Initializing Marathon Training Dashboard...');
-    
+
     // Initialize any existing charts
     initializeCharts();
-    
+
     // Setup auto-refresh for live data (optional)
     // setupAutoRefresh();
-    
+
     // Initialize tooltips and popovers
     initializeBootstrapComponents();
 }
@@ -47,7 +47,7 @@ function setupEventListeners() {
             runManualTask();
         });
     });
-    
+
     // Handle athlete toggle buttons
     const toggleButtons = document.querySelectorAll('[onclick*="toggleAthlete"]');
     toggleButtons.forEach(button => {
@@ -57,7 +57,7 @@ function setupEventListeners() {
             toggleAthlete(athleteId);
         });
     });
-    
+
     // Handle date selector changes
     const dateSelector = document.getElementById('dateSelector');
     if (dateSelector) {
@@ -76,7 +76,7 @@ function initializeBootstrapComponents() {
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
-    
+
     // Initialize popovers
     const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
     popoverTriggerList.map(function (popoverTriggerEl) {
@@ -92,7 +92,7 @@ function initializeCharts() {
         console.log('Chart.js not loaded, skipping chart initialization');
         return;
     }
-    
+
     // Set Chart.js defaults for dark theme
     Chart.defaults.color = '#ffffff';
     Chart.defaults.borderColor = '#374151';
@@ -105,12 +105,12 @@ function initializeCharts() {
 function createWeeklyTrendsChart(canvasId, data) {
     const ctx = document.getElementById(canvasId);
     if (!ctx || typeof Chart === 'undefined') return null;
-    
+
     // Destroy existing chart if it exists
     if (chartInstances[canvasId]) {
         chartInstances[canvasId].destroy();
     }
-    
+
     chartInstances[canvasId] = new Chart(ctx, {
         type: 'line',
         data: {
@@ -181,7 +181,7 @@ function createWeeklyTrendsChart(canvasId, data) {
             }
         }
     });
-    
+
     return chartInstances[canvasId];
 }
 
@@ -191,15 +191,15 @@ function createWeeklyTrendsChart(canvasId, data) {
 function createStatusBreakdownChart(canvasId, statusData) {
     const ctx = document.getElementById(canvasId);
     if (!ctx || typeof Chart === 'undefined') return null;
-    
+
     // Destroy existing chart if it exists
     if (chartInstances[canvasId]) {
         chartInstances[canvasId].destroy();
     }
-    
+
     const labels = Object.keys(statusData);
     const data = Object.values(statusData);
-    
+
     const backgroundColors = [
         '#28a745', // On Track - green
         '#17a2b8', // Over-performed - info
@@ -208,7 +208,7 @@ function createStatusBreakdownChart(canvasId, statusData) {
         '#007bff', // Extra Activity - primary
         '#6c757d'  // Other - secondary
     ];
-    
+
     chartInstances[canvasId] = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -245,7 +245,7 @@ function createStatusBreakdownChart(canvasId, statusData) {
             }
         }
     });
-    
+
     return chartInstances[canvasId];
 }
 
@@ -255,14 +255,14 @@ function createStatusBreakdownChart(canvasId, statusData) {
 function runManualStravaSync(targetDate = null) {
     const button = event.target.closest('button');
     const originalText = button.innerHTML;
-    
+
     // Show loading state
     button.disabled = true;
     button.innerHTML = '<i data-feather="loader" class="me-1"></i> Syncing...';
     feather.replace();
-    
+
     const requestData = targetDate ? { date: targetDate } : {};
-    
+
     fetch('/api/manual-run', {
         method: 'POST',
         headers: {
@@ -300,15 +300,15 @@ function runManualStravaSync(targetDate = null) {
 function runManualTask(targetDate = null) {
     const button = event?.target?.closest('button');
     const originalText = button?.innerHTML;
-    
+
     // Show loading state
     if (button) {
         button.disabled = true;
         button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running...';
     }
-    
+
     const payload = targetDate ? { date: targetDate } : {};
-    
+
     fetch('/api/manual-run', {
         method: 'POST',
         headers: {
@@ -348,12 +348,12 @@ function runManualTask(targetDate = null) {
 function toggleAthlete(athleteId) {
     const button = event?.target?.closest('button');
     const originalContent = button?.innerHTML;
-    
+
     if (button) {
         button.disabled = true;
         button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
     }
-    
+
     fetch(`/api/athlete/${athleteId}/toggle`, {
         method: 'POST',
         headers: {
@@ -406,11 +406,11 @@ function showAlert(message, type = 'info', duration = 5000) {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     `;
-    
+
     // Find container to prepend alert
     const container = document.querySelector('.container') || document.body;
     container.insertBefore(alertDiv, container.firstChild);
-    
+
     // Auto-dismiss after duration
     if (duration > 0) {
         setTimeout(() => {
@@ -419,7 +419,7 @@ function showAlert(message, type = 'info', duration = 5000) {
             }
         }, duration);
     }
-    
+
     return alertDiv;
 }
 
@@ -430,7 +430,7 @@ function formatPace(paceMinPerKm) {
     if (!paceMinPerKm || paceMinPerKm <= 0) {
         return 'N/A';
     }
-    
+
     const minutes = Math.floor(paceMinPerKm);
     const seconds = Math.round((paceMinPerKm - minutes) * 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -443,7 +443,7 @@ function formatDistance(distanceKm) {
     if (!distanceKm || distanceKm <= 0) {
         return '0.0 km';
     }
-    
+
     return `${distanceKm.toFixed(1)} km`;
 }
 
@@ -454,7 +454,7 @@ function formatVariance(variance) {
     if (variance === null || variance === undefined) {
         return '0.0%';
     }
-    
+
     const sign = variance >= 0 ? '+' : '';
     return `${sign}${variance.toFixed(1)}%`;
 }
@@ -471,7 +471,7 @@ function getStatusBadgeClass(status) {
         'Extra Activity': 'bg-primary',
         'Partially Completed': 'bg-secondary'
     };
-    
+
     return statusMap[status] || 'bg-secondary';
 }
 
@@ -480,16 +480,16 @@ function getStatusBadgeClass(status) {
  */
 function setupAutoRefresh(intervalMinutes = 30) {
     const interval = intervalMinutes * 60 * 1000; // Convert to milliseconds
-    
+
     setInterval(() => {
         // Only refresh if user is on dashboard page and tab is visible
         if (window.location.pathname.includes('/dashboard') && !document.hidden) {
             console.log('Auto-refreshing dashboard data...');
-            
+
             // Fetch updated data without full page reload
             const currentDate = document.getElementById('dateSelector')?.value || 
                                new Date().toISOString().split('T')[0];
-            
+
             fetch(`/api/dashboard-data/${currentDate}`)
                 .then(response => response.json())
                 .then(data => {
@@ -512,10 +512,10 @@ function updateDashboardData(data) {
     // This function would update specific parts of the dashboard
     // Implementation depends on specific UI elements that need updating
     console.log('Updating dashboard data:', data);
-    
+
     // Example: Update team summary cards
     updateTeamSummaryCards(data.team_summary);
-    
+
     // Example: Update charts
     if (data.weekly_trends) {
         updateWeeklyTrendsChart(data.weekly_trends);
@@ -527,7 +527,7 @@ function updateDashboardData(data) {
  */
 function updateTeamSummaryCards(teamSummary) {
     if (!teamSummary) return;
-    
+
     // Update individual card values
     const cards = {
         'total_athletes': teamSummary.total_athletes || 0,
@@ -535,7 +535,7 @@ function updateTeamSummaryCards(teamSummary) {
         'completion_rate': `${teamSummary.completion_rate || 0}%`,
         'average_distance_variance': `${(teamSummary.average_distance_variance || 0).toFixed(1)}%`
     };
-    
+
     Object.entries(cards).forEach(([key, value]) => {
         const element = document.querySelector(`[data-metric="${key}"]`);
         if (element) {
@@ -607,3 +607,34 @@ window.DashboardApp = {
     createWeeklyTrendsChart,
     createStatusBreakdownChart
 };
+
+function runManualSync() {
+    if (confirm('Run manual sync for today?')) {
+        fetch('/api/manual-run', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                showAlert('Manual sync completed successfully', 'success');
+                // Refresh the page after a short delay
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showAlert('Manual sync failed: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error running manual sync:', error);
+            showAlert('Error running manual sync: ' + error.message, 'error');
+        });
+    }
+}

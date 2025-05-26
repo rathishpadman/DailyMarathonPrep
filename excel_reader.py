@@ -49,15 +49,37 @@ class ExcelReader:
                 return None
 
             # Enhanced date parsing to handle multiple formats
-            df['Date'] = pd.to_datetime(df['Date'], errors='coerce', format='%d/%m/%Y')
+            original_dates = df['Date'].copy()
+            
+            # Try multiple date formats
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
+            
+            # If still NaT, try other formats
             if df['Date'].isna().any():
-                # Try different date formats
-                df['Date'] = pd.to_datetime(df['Date'], errors='coerce', format='%m/%d/%Y')
+                mask = df['Date'].isna()
+                # Try DD/MM/YYYY format
+                df.loc[mask, 'Date'] = pd.to_datetime(original_dates[mask], format='%d/%m/%Y', errors='coerce')
+            
             if df['Date'].isna().any():
-                # Try ISO format
-                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                mask = df['Date'].isna()
+                # Try MM/DD/YYYY format
+                df.loc[mask, 'Date'] = pd.to_datetime(original_dates[mask], format='%m/%d/%Y', errors='coerce')
+            
+            if df['Date'].isna().any():
+                mask = df['Date'].isna()
+                # Try YYYY-MM-DD format
+                df.loc[mask, 'Date'] = pd.to_datetime(original_dates[mask], format='%Y-%m-%d', errors='coerce')
+            
+            # Remove rows with unparseable dates
+            valid_dates_mask = df['Date'].notna()
+            df = df[valid_dates_mask].copy()
+            
+            if df.empty:
+                logger.error("No valid dates found in training plan after parsing")
+                return None
             
             logger.info(f"Date range in training plan: {df['Date'].min()} to {df['Date'].max()}")
+            logger.info(f"Successfully parsed {len(df)} rows with valid dates")
 
             if df['Date'].isna().any():
                 logger.warning(
@@ -102,8 +124,9 @@ class ExcelReader:
             df_clean['PlannedPaceMinPerKM'] = pd.to_numeric(
                 df_clean['PlannedPaceMinPerKM'], errors='coerce')
 
-            df_clean['WorkoutType'].fillna('Regular Run', inplace=True)
-            df_clean['Notes'].fillna('', inplace=True)
+            df_clean = df_clean.copy()
+            df_clean['WorkoutType'] = df_clean['WorkoutType'].fillna('Regular Run')
+            df_clean['Notes'] = df_clean['Notes'].fillna('')
 
             df_clean = df_clean.dropna(
                 subset=['PlannedDistanceKM', 'PlannedPaceMinPerKM'])

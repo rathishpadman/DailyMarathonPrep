@@ -395,10 +395,10 @@ function runManualStravaSync(targetDate = null) {
 
     // Show loading state
     button.disabled = true;
-    button.innerHTML = '<i data-feather="loader" class="me-1"></i> Syncing...';
+    button.innerHTML = '<i data-feather="loader" class="me-1"></i> Syncing from May 19th...';
     feather.replace();
 
-    const requestData = targetDate ? { date: targetDate } : {};
+    const requestData = targetDate ? { date: targetDate, type: 'single' } : { type: 'range' };
 
     fetch('/api/manual-run', {
         method: 'POST',
@@ -410,11 +410,11 @@ function runManualStravaSync(targetDate = null) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showAlert('Strava sync completed successfully! Dashboard updated with latest activities.', 'success');
+            showAlert(`${data.message} Dashboard updated with latest activities.`, 'success');
             // Reload the page to show updated data
             setTimeout(() => {
                 location.reload();
-            }, 1500);
+            }, 2000);
         } else {
             showAlert(`Sync error: ${data.message}`, 'danger');
         }

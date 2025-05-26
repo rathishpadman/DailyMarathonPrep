@@ -411,12 +411,64 @@ class DailyTaskScheduler:
             logger.error(f"Failed to start scheduler thread: {e}")
 
     def manual_execution(self, target_date: Optional[datetime] = None) -> bool:
-        """Manually execute tasks for a specific date (for testing/debugging)"""
+        """Manually execute tasks for a specific date or date range (for testing/debugging)"""
         if target_date is None:
-            target_date = datetime.now()
+            # Default: sync from May 19, 2025 to current date
+            start_date = datetime(2025, 5, 19)
+            end_date = datetime.now()
+            return self.execute_date_range_sync(start_date, end_date)
+        else:
+            logger.info(f"Manual execution for {target_date.strftime('%Y-%m-%d')}")
+            return self.execute_daily_tasks(target_date)
 
-        logger.info(f"Manual execution for {target_date.strftime('%Y-%m-%d')}")
-        return self.execute_daily_tasks(target_date)
+    def execute_date_range_sync(self, start_date: datetime, end_date: datetime) -> bool:
+        """Execute sync for a range of dates from May 19th to current date"""
+        logger.info(f"Starting date range sync from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+        
+        try:
+            with app.app_context():
+                # Step 1: Update training plan first
+                plan_updated = self._update_training_plan()
+                if not plan_updated:
+                    logger.warning("Training plan update failed, but continuing with sync")
+
+                # Step 2: Process each date in the range
+                current_date = start_date
+                successful_days = 0
+                total_days = (end_date.date() - start_date.date()).days + 1
+
+                while current_date.date() <= end_date.date():
+                    try:
+                        logger.info(f"Processing date: {current_date.strftime('%Y-%m-%d')}")
+                        
+                        # Fetch and process Strava data for this date
+                        success = self._fetch_and_process_strava_data(current_date)
+                        if success:
+                            successful_days += 1
+                        
+                        # Move to next day
+                        current_date += timedelta(days=1)
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to process date {current_date.strftime('%Y-%m-%d')}: {e}")
+                        current_date += timedelta(days=1)
+                        continue
+
+                # Step 3: Generate dashboard for the end date
+                dashboard_data = self.dashboard_builder.build_daily_dashboard(end_date)
+                
+                logger.info(f"Date range sync completed: {successful_days}/{total_days} days processed successfully")
+                
+                # Log the completion
+                self._log_system_event("SUCCESS", f"Date range sync completed: {successful_days}/{total_days} days from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+                
+                return successful_days > 0
+
+        except Exception as e:
+            error_msg = f"Date range sync failed: {e}"
+            self._log_system_event("ERROR", error_msg)
+            logger.error(error_msg)
+            return False
 
     def health_check(self) -> dict:
         """Perform a health check of the scheduler system"""

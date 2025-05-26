@@ -610,31 +610,35 @@ def manual_run():
     try:
         # Get target date from request with better error handling
         target_date_str = None
+        sync_type = 'range'  # Default to range sync
+        
         if request.is_json and request.json:
             target_date_str = request.json.get('date')
+            sync_type = request.json.get('type', 'range')
         elif request.form:
             target_date_str = request.form.get('date')
+            sync_type = request.form.get('type', 'range')
 
-        if target_date_str:
+        if target_date_str and sync_type == 'single':
             try:
                 target_date = datetime.strptime(target_date_str, '%Y-%m-%d')
+                success = run_manual_task(target_date)
+                message = f"Manual task execution completed for {target_date.strftime('%Y-%m-%d')}"
             except ValueError as ve:
                 error_msg = f"Invalid date format: {target_date_str}. Use YYYY-MM-DD format."
                 logger.error(error_msg)
                 return jsonify({"success": False, "message": error_msg}), 400
         else:
-            # Default to current date for syncing
-            target_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
-        # Run manual task
-        success = run_manual_task(target_date)
+            # Default: sync from May 19, 2025 to current date
+            success = run_manual_task()  # This will trigger date range sync
+            start_date = datetime(2025, 5, 19)
+            end_date = datetime.now()
+            message = f"Date range sync completed from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
 
         if success:
-            message = f"Manual task execution completed successfully for {target_date.strftime('%Y-%m-%d')}"
             return jsonify({"success": True, "message": message})
         else:
-            message = f"Manual task execution failed for {target_date.strftime('%Y-%m-%d')}"
-            return jsonify({"success": False, "message": message}), 500
+            return jsonify({"success": False, "message": f"Sync failed: {message}"}), 500
 
     except Exception as e:
         error_msg = f"Error during manual execution: {str(e)}"
@@ -807,19 +811,19 @@ def api_system_logs():
 # FIX: Add new endpoint for immediate sync
 @app.route('/api/sync-current', methods=['POST'])
 def sync_current():
-    """API endpoint to sync current day activities immediately"""
+    """API endpoint to sync all activities from May 19th to current date"""
     try:
-        current_date = datetime.now().replace(hour=0,
-                                              minute=0,
-                                              second=0,
-                                              microsecond=0)
-        success = run_manual_task(current_date)
+        # Sync full date range from May 19, 2025 to current date
+        success = run_manual_task()  # This will trigger date range sync
+        
+        start_date = datetime(2025, 5, 19)
+        end_date = datetime.now()
 
         if success:
-            message = f"Successfully synced activities for {current_date.strftime('%Y-%m-%d')}"
+            message = f"Successfully synced all activities from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
             return jsonify({"success": True, "message": message})
         else:
-            message = f"Sync failed for {current_date.strftime('%Y-%m-%d')}"
+            message = f"Sync failed for date range {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
             return jsonify({"success": False, "message": message})
 
     except Exception as e:

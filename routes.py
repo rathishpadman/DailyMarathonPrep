@@ -474,9 +474,10 @@ def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter=
 def athletes():
     """Athletes management page"""
     try:
-        # FIX: Order by name and ensure distinct athletes
-        athletes_list = db.session.query(Athlete).order_by(
-            Athlete.name).distinct().all()
+        # Only show athletes who have connected through Strava (have refresh_token)
+        athletes_list = db.session.query(Athlete).filter(
+            Athlete.refresh_token.isnot(None)
+        ).order_by(Athlete.name).distinct().all()
 
         # Get athlete stats
         athlete_stats = []
@@ -809,6 +810,36 @@ def api_system_logs():
 
 
 # FIX: Add new endpoint for immediate sync
+@app.route('/api/remove-inactive-athletes', methods=['POST'])
+def remove_inactive_athletes():
+    """Remove athletes who are not connected to Strava (no refresh token)"""
+    try:
+        athletes_without_strava = db.session.query(Athlete).filter(
+            Athlete.refresh_token.is_(None)
+        ).all()
+        
+        removed_count = 0
+        for athlete in athletes_without_strava:
+            # Remove associated planned workouts and daily summaries first
+            db.session.query(PlannedWorkout).filter_by(athlete_id=athlete.id).delete()
+            db.session.query(DailySummary).filter_by(athlete_id=athlete.id).delete()
+            db.session.delete(athlete)
+            removed_count += 1
+
+        db.session.commit()
+        logger.info(f"Removed {removed_count} inactive athletes")
+        
+        return jsonify({
+            "success": True, 
+            "message": f"Removed {removed_count} athletes without Strava connection"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error removing inactive athletes: {e}")
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)})
+
+
 @app.route('/api/sync-current', methods=['POST'])
 def sync_current():
     """API endpoint to sync all activities from May 19th to current date"""

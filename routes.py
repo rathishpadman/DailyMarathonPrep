@@ -222,7 +222,7 @@ def upload_training_plan():
                     'Uploaded file format is invalid. Please check the required columns and data format.',
                     'error')
         else:
-            flash('Please upload a valid Excel file (.xlsx or .xls)', 'error')
+            flash('Please upload a valid Excel file (.xlsx, .xls) or CSV file (.csv)', 'error')
 
     except Exception as e:
         logger.error(f"Error uploading training plan: {e}")

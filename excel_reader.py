@@ -46,7 +46,7 @@ class ExcelReader:
                 )
                 return None
 
-            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
 
             if df['Date'].isna().any():
                 logger.warning(
@@ -231,8 +231,8 @@ class ExcelReader:
             if has_all_columns:
                 # Check data types and quality
                 try:
-                    # Test date parsing
-                    pd.to_datetime(df['Date'].head(), errors='coerce')
+                    # Test date parsing with flexible format
+                    pd.to_datetime(df['Date'].head(), errors='coerce', dayfirst=True)
                     
                     # Test numeric columns
                     pd.to_numeric(df['PlannedDistanceKM'].head(), errors='coerce')

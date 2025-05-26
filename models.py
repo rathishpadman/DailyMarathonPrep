@@ -1,6 +1,7 @@
 from app import db
 from datetime import datetime
-from sqlalchemy import Text, Float, Integer, String, DateTime, Boolean
+from sqlalchemy import Text, Float, Integer, String, DateTime, Boolean, UniqueConstraint
+
 
 class Athlete(db.Model):
     """Model for storing athlete information and Strava credentials"""
@@ -12,17 +13,24 @@ class Athlete(db.Model):
     token_expires_at = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     activities = db.relationship('Activity', backref='athlete', lazy=True)
-    planned_workouts = db.relationship('PlannedWorkout', backref='athlete', lazy=True)
-    daily_summaries = db.relationship('DailySummary', backref='athlete', lazy=True)
+    planned_workouts = db.relationship('PlannedWorkout',
+                                       backref='athlete',
+                                       lazy=True)
+    daily_summaries = db.relationship('DailySummary',
+                                      backref='athlete',
+                                      lazy=True)
+
 
 class Activity(db.Model):
     """Model for storing Strava activity data"""
     id = db.Column(db.Integer, primary_key=True)
     strava_activity_id = db.Column(db.Integer, unique=True, nullable=False)
-    athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=False)
+    athlete_id = db.Column(db.Integer,
+                           db.ForeignKey('athlete.id'),
+                           nullable=False)
     name = db.Column(db.String(200), nullable=False)
     activity_type = db.Column(db.String(50), nullable=False)
     start_date = db.Column(db.DateTime, nullable=False)
@@ -30,11 +38,16 @@ class Activity(db.Model):
     moving_time_seconds = db.Column(db.Integer, nullable=False)
     pace_min_per_km = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('strava_activity_id',
+                                          name='unique_strava_activity'), )
+
 
 class PlannedWorkout(db.Model):
     """Model for storing planned workouts from Excel file"""
     id = db.Column(db.Integer, primary_key=True)
-    athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=False)
+    athlete_id = db.Column(db.Integer,
+                           db.ForeignKey('athlete.id'),
+                           nullable=False)
     workout_date = db.Column(db.DateTime, nullable=False)
     planned_distance_km = db.Column(db.Float, nullable=False)
     planned_pace_min_per_km = db.Column(db.Float, nullable=False)
@@ -42,10 +55,16 @@ class PlannedWorkout(db.Model):
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    __table_args__ = (db.UniqueConstraint(
+        'athlete_id', 'workout_date', name='unique_athlete_workout_date'), )
+
+
 class DailySummary(db.Model):
     """Model for storing daily performance summaries"""
     id = db.Column(db.Integer, primary_key=True)
-    athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=False)
+    athlete_id = db.Column(db.Integer,
+                           db.ForeignKey('athlete.id'),
+                           nullable=False)
     summary_date = db.Column(db.DateTime, nullable=False)
     actual_distance_km = db.Column(db.Float, nullable=True)
     planned_distance_km = db.Column(db.Float, nullable=True)
@@ -53,15 +72,20 @@ class DailySummary(db.Model):
     planned_pace_min_per_km = db.Column(db.Float, nullable=True)
     distance_variance_percent = db.Column(db.Float, nullable=True)
     pace_variance_percent = db.Column(db.Float, nullable=True)
-    status = db.Column(db.String(50), nullable=True)  # On Track, Under-performed, etc.
+    status = db.Column(db.String(50),
+                       nullable=True)  # On Track, Under-performed, etc.
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
+    
+    # This is the KEY change: Ensure only one summary per athlete per day
+    __table_args__ = (UniqueConstraint('athlete_id', 'summary_date', name='uq_daily_summary_athlete_date'),)
+    
 class SystemLog(db.Model):
     """Model for storing system execution logs"""
     id = db.Column(db.Integer, primary_key=True)
     log_date = db.Column(db.DateTime, nullable=False)
-    log_type = db.Column(db.String(50), nullable=False)  # SUCCESS, ERROR, WARNING
+    log_type = db.Column(db.String(50),
+                         nullable=False)  # SUCCESS, ERROR, WARNING
     message = db.Column(db.Text, nullable=False)
     details = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

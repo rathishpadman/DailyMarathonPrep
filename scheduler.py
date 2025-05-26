@@ -21,7 +21,7 @@ class DailyTaskScheduler:
 
     def __init__(self):
         self.strava_client = StravaClient()
-        self.excel_reader = ExcelReader()
+        self.excel_reader = ExcelReader(Config.TRAINING_PLAN_FILE)
         self.data_processor = DataProcessor()
         self.dashboard_builder = DashboardBuilder()
         self.notification_manager = NotificationManager()
@@ -85,6 +85,9 @@ class DailyTaskScheduler:
     def _update_training_plan(self) -> bool:
         """Update training plan from Excel file"""
         try:
+            # Use the current training plan file from config
+            self.excel_reader = ExcelReader(Config.TRAINING_PLAN_FILE)
+            
             # Validate Excel file format
             validation_results = self.excel_reader.validate_excel_format()
 

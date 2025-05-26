@@ -102,34 +102,38 @@
                 <div class="card-body">
                     {% if summary_data %}
                     <div class="table-responsive">
-                        <table class="table table-hover">
+                        <div id="loadingIndicator" class="text-center py-3" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        <table class="table table-hover" id="summaryTable">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
+                                    <th>Period</th>
                                     <th>Athletes</th>
-                                    <th>Planned Distance</th>
-                                    <th>Actual Distance</th>
-                                    <th>Variance</th>
+                                    <th>Planned (km)</th>
+                                    <th>Actual (km)</th>
                                     <th>Completion Rate</th>
+                                    <th>Status</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="summaryTableBody">
                                 {% for day_data in summary_data %}
                                 <tr>
-                                    <td>{{ day_data.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ day_data.period_label if day_data.period_label else day_data.date.strftime('%Y-%m-%d') }}</td>
                                     <td>{{ day_data.athletes|length }}</td>
-                                    <td>{{ "%.1f"|format(day_data.total_planned) }} km</td>
-                                    <td>{{ "%.1f"|format(day_data.total_actual) }} km</td>
+                                    <td>{{ "%.1f"|format(day_data.total_planned) }}</td>
+                                    <td>{{ "%.1f"|format(day_data.total_actual) }}</td>
+                                    <td>{{ "%.1f"|format(day_data.completion_rate) }}%</td>
                                     <td>
-                                        {% set variance = ((day_data.total_actual - day_data.total_planned) / day_data.total_planned * 100) if day_data.total_planned > 0 else 0 %}
-                                        <span class="{% if variance >= 0 %}text-success{% else %}text-danger{% endif %}">
-                                            {{ "%+.1f"|format(variance) }}%
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="{% if day_data.completion_rate >= 80 %}text-success{% elif day_data.completion_rate >= 60 %}text-warning{% else %}text-danger{% endif %}">
-                                            {{ "%.0f"|format(day_data.completion_rate) }}%
-                                        </span>
+                                        {% if day_data.completion_rate >= 80 %}
+                                            <span class="badge bg-success">Excellent</span>
+                                        {% elif day_data.completion_rate >= 60 %}
+                                            <span class="badge bg-warning">Good</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Needs Improvement</span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -215,5 +219,75 @@ function toggleAthlete(athleteId) {
     })
     .catch(error => alert('Error: ' + error.message));
 }
+
+function updateSummaryData(period) {
+    // Show loading indicator
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const summaryTable = document.getElementById('summaryTable');
+    const tableBody = document.getElementById('summaryTableBody');
+
+    loadingIndicator.style.display = 'block';
+    summaryTable.style.opacity = '0.5';
+
+    // Update button states
+    document.querySelectorAll('.btn-group button').forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+    document.getElementById(`btn-${period}`).classList.remove('btn-outline-primary');
+    document.getElementById(`btn-${period}`).classList.add('btn-primary');
+
+    fetch(`/api/summary-stats/${period}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // Update table body
+            tableBody.innerHTML = '';
+            if (data.summary_data && data.summary_data.length > 0) {
+                data.summary_data.forEach(item => {
+                    const row = document.createElement('tr');
+
+                    let statusBadge = '';
+                    if (item.completion_rate >= 80) {
+                        statusBadge = '<span class="badge bg-success">Excellent</span>';
+                    } else if (item.completion_rate >= 60) {
+                        statusBadge = '<span class="badge bg-warning">Good</span>';
+                    } else {
+                        statusBadge = '<span class="badge bg-danger">Needs Improvement</span>';
+                    }
+
+                    row.innerHTML = `
+                        <td>${item.period_label || new Date(item.date).toLocaleDateString()}</td>
+                        <td>${item.athletes.length}</td>
+                        <td>${item.total_planned.toFixed(1)}</td>
+                        <td>${item.total_actual.toFixed(1)}</td>
+                        <td>${item.completion_rate.toFixed(1)}%</td>
+                        <td>${statusBadge}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } else {
+                const row = document.createElement('tr');
+                row.innerHTML = '<td colspan="6" class="text-center text-muted">No data available</td>';
+                tableBody.appendChild(row);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating summary data:', error);
+            alert('Error loading summary data: ' + error.message);
+        })
+        .finally(() => {
+            loadingIndicator.style.display = 'none';
+            summaryTable.style.opacity = '1';
+        });
+}
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    feather.replace();
+});
 </script>
 {% endblock %}

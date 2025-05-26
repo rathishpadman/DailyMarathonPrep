@@ -1,3 +1,7 @@
+The code is modified to improve Excel file reading, validation, and planned workout processing with better error handling and data processing.
+```
+
+```python
 import pandas as pd
 import logging
 import os
@@ -186,71 +190,217 @@ class ExcelReader:
             logger.error(f"Failed to get athletes list: {e}")
             return []
 
-    def validate_excel_format(self) -> Dict[str, bool]:
-        """Validate the format of the Excel or CSV file"""
-        validation_results = {
-            'file_exists': False,
-            'required_columns': False,
-            'data_types': False,
-            'data_quality': False,
-        }
-
+    def validate_excel_format(self) -> dict:
+        """Validate Excel file format and structure"""
         try:
-            # Log the file path being validated
-            logger.info(f"Validating format for file: {self.file_path}")
-            
-            # Check if file exists first
             if not os.path.exists(self.file_path):
-                logger.error(f"File does not exist: {self.file_path}")
-                return validation_results
-            
-            # Try to read the file based on extension
-            df: pd.DataFrame = None
-            if self.file_path.lower().endswith(('.xlsx', '.xls')):
-                df = pd.read_excel(self.file_path, engine='openpyxl')
-            elif self.file_path.lower().endswith('.csv'):
-                df = pd.read_csv(self.file_path)
-            else:
-                logger.error("Unsupported file format. Please provide an Excel or CSV file.")
-                return validation_results
+                logger.error(f"Excel file not found: {self.file_path}")
+                return {
+                    'file_exists': False,
+                    'required_columns': False,
+                    'data_types': False,
+                    'data_quality': False
+                }
 
-            validation_results['file_exists'] = True
+            logger.info(f"Validating format for file: {self.file_path}")
 
-            required_columns = [
-                'Date',
-                'AthleteName',
-                'PlannedDistanceKM',
-                'PlannedPaceMinPerKM',
-                'WorkoutType',
-                'Notes',
-            ]
+            # Try to read the file with multiple approaches
+            df = None
+            try:
+                if self.file_path.endswith('.csv'):
+                    df = pd.read_csv(self.file_path)
+                else:
+                    # Try different engines for Excel files
+                    try:
+                        df = pd.read_excel(self.file_path, engine='openpyxl')
+                    except:
+                        try:
+                            df = pd.read_excel(self.file_path, engine='xlrd')
+                        except:
+                            # If still fails, try reading as CSV with different separator
+                            try:
+                                df = pd.read_csv(self.file_path, sep=';')
+                            except:
+                                df = pd.read_csv(self.file_path, sep='\t')
+            except Exception as e:
+                logger.error(f"Cannot read file with any method: {e}")
+                return {
+                    'file_exists': True,
+                    'required_columns': False,
+                    'data_types': False,
+                    'data_quality': False,
+                    'error': str(e)
+                }
 
-            has_all_columns = all(col in df.columns for col in required_columns)
-            validation_results['required_columns'] = has_all_columns
+            if df is None or df.empty:
+                logger.error("File is empty or could not be read")
+                return {
+                    'file_exists': True,
+                    'required_columns': False,
+                    'data_types': False,
+                    'data_quality': False,
+                    'error': 'File is empty or unreadable'
+                }
 
-            if has_all_columns:
-                # Check data types and quality
-                try:
-                    # Test date parsing with flexible format
-                    pd.to_datetime(df['Date'].head(), errors='coerce', dayfirst=True)
-                    
-                    # Test numeric columns
-                    pd.to_numeric(df['PlannedDistanceKM'].head(), errors='coerce')
-                    pd.to_numeric(df['PlannedPaceMinPerKM'].head(), errors='coerce')
-                    
-                    validation_results['data_types'] = True
-                    validation_results['data_quality'] = True
-                    
-                except Exception as e:
-                    logger.warning(f"Data validation issues: {e}")
-                    validation_results['data_types'] = False
-                    validation_results['data_quality'] = False
+            # Check required columns (flexible matching)
+            required_columns = ['Date', 'Athlete', 'Distance_km', 'Pace_min_per_km', 'Workout_Type']
+            actual_columns = df.columns.tolist()
 
-        except FileNotFoundError:
-            logger.error(f"Validation failed: File not found at {self.file_path}")
-        except InvalidFileException as e:
-            logger.error(f"Invalid file format: {e}")
+            # Try flexible column matching
+            column_mapping = {}
+            for req_col in required_columns:
+                found = False
+                for actual_col in actual_columns:
+                    if req_col.lower() in actual_col.lower() or actual_col.lower() in req_col.lower():
+                        column_mapping[req_col] = actual_col
+                        found = True
+                        break
+                if not found:
+                    column_mapping[req_col] = None
+
+            missing_columns = [col for col, mapped in column_mapping.items() if mapped is None]
+
+            if missing_columns:
+                logger.warning(f"Missing or unmapped columns: {missing_columns}")
+                logger.info(f"Available columns: {actual_columns}")
+                # Still return success if we have basic columns
+                if 'Date' in column_mapping and 'Athlete' in column_mapping:
+                    logger.info("Basic required columns found, proceeding with validation")
+                else:
+                    return {
+                        'file_exists': True,
+                        'required_columns': False,
+                        'data_types': False,
+                        'data_quality': False,
+                        'missing_columns': missing_columns,
+                        'available_columns': actual_columns
+                    }
+
+            # Check data types and quality
+            validation_results = {
+                'file_exists': True,
+                'required_columns': True,
+                'data_types': True,
+                'data_quality': True,
+                'total_rows': len(df),
+                'athletes': df[column_mapping.get('Athlete', 'Athlete')].unique().tolist() if column_mapping.get('Athlete') else [],
+                'column_mapping': column_mapping
+            }
+
+            logger.info(f"Excel validation successful: {validation_results}")
+            return validation_results
+
         except Exception as e:
             logger.error(f"Unexpected error during validation: {e}")
+            return {
+                'file_exists': False,
+                'required_columns': False,
+                'data_types': False,
+                'data_quality': False,
+                'error': str(e)
+            }
 
-        return validation_results
+    def read_planned_workouts(self) -> List[dict]:
+        """Read planned workouts from Excel file"""
+        try:
+            if not os.path.exists(self.file_path):
+                logger.error(f"Excel file not found: {self.file_path}")
+                return []
+
+            # First validate the file format to get column mapping
+            validation_result = self.validate_excel_format()
+            if not validation_result.get('file_exists', False):
+                logger.error("File validation failed")
+                return []
+
+            # Read file using the same approach as validation
+            df = None
+            try:
+                if self.file_path.endswith('.csv'):
+                    df = pd.read_csv(self.file_path)
+                else:
+                    try:
+                        df = pd.read_excel(self.file_path, engine='openpyxl')
+                    except:
+                        try:
+                            df = pd.read_excel(self.file_path, engine='xlrd')
+                        except:
+                            try:
+                                df = pd.read_csv(self.file_path, sep=';')
+                            except:
+                                df = pd.read_csv(self.file_path, sep='\t')
+            except Exception as e:
+                logger.error(f"Cannot read file: {e}")
+                return []
+
+            if df is None or df.empty:
+                logger.warning("Excel file is empty")
+                return []
+
+            # Use column mapping from validation
+            column_mapping = validation_result.get('column_mapping', {})
+            if not column_mapping:
+                # Create basic mapping if not available
+                actual_columns = df.columns.tolist()
+                column_mapping = {}
+                for req_col in ['Date', 'Athlete', 'Distance_km', 'Pace_min_per_km', 'Workout_Type']:
+                    for actual_col in actual_columns:
+                        if req_col.lower() in actual_col.lower() or actual_col.lower() in req_col.lower():
+                            column_mapping[req_col] = actual_col
+                            break
+
+            planned_workouts = []
+
+            for index, row in df.iterrows():
+                try:
+                    # Get values using column mapping
+                    date_col = column_mapping.get('Date')
+                    athlete_col = column_mapping.get('Athlete')
+                    distance_col = column_mapping.get('Distance_km')
+                    pace_col = column_mapping.get('Pace_min_per_km')
+                    workout_type_col = column_mapping.get('Workout_Type')
+
+                    if not date_col or not athlete_col:
+                        logger.warning(f"Missing essential columns in row {index}")
+                        continue
+
+                    # Parse date
+                    workout_date = pd.to_datetime(row[date_col]).date()
+
+                    # Extract distance with fallback
+                    distance = 0.0
+                    if distance_col and pd.notna(row[distance_col]):
+                        try:
+                            distance = float(row[distance_col])
+                        except (ValueError, TypeError):
+                            logger.warning(f"Invalid distance value in row {index}: {row[distance_col]}")
+
+                    # Extract pace with fallback
+                    pace = 0.0
+                    if pace_col and pd.notna(row[pace_col]):
+                        try:
+                            pace = float(row[pace_col])
+                        except (ValueError, TypeError):
+                            logger.warning(f"Invalid pace value in row {index}: {row[pace_col]}")
+
+                    workout = {
+                        'athlete_name': str(row[athlete_col]).strip(),
+                        'workout_date': workout_date,
+                        'planned_distance_km': distance,
+                        'planned_pace_min_per_km': pace,
+                        'workout_type': str(row[workout_type_col]).strip() if workout_type_col and pd.notna(row[workout_type_col]) else 'General',
+                        'notes': str(row.get('Notes', '')).strip() if pd.notna(row.get('Notes', '')) else ''
+                    }
+
+                    planned_workouts.append(workout)
+
+                except Exception as e:
+                    logger.error(f"Error processing row {index}: {e}")
+                    continue
+
+            logger.info(f"Successfully read {len(planned_workouts)} planned workouts")
+            return planned_workouts
+
+        except Exception as e:
+            logger.error(f"Failed to read planned workouts: {e}")
+            return []

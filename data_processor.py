@@ -109,20 +109,17 @@ class DataProcessor:
             else:
                 logger.debug(f"No planned workout found for athlete {athlete_id} on {target_date_only}")
 
-            # Get actual activities for the date - FIX: Use proper date range and distinct
-            start_of_day = datetime.combine(target_date_only, datetime.min.time())
-            end_of_day = start_of_day + timedelta(days=1)
-
-            # Debug logging for activity matching
-            logger.debug(f"Looking for activities between {start_of_day} and {end_of_day}")
-
+            # Get actual activities for the date - FIX: Use date-only comparison
+            # Convert activity start_date to date for comparison
             activities = db.session.query(Activity).filter(
                 and_(
                     Activity.athlete_id == athlete_id,
-                    Activity.start_date >= start_of_day,
-                    Activity.start_date < end_of_day
+                    func.date(Activity.start_date) == target_date_only
                 )
             ).distinct().all()
+
+            # Debug logging for activity matching
+            logger.debug(f"Looking for activities on date {target_date_only}")
 
             # Log found activities for debugging
             for activity in activities:

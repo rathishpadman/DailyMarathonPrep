@@ -903,15 +903,11 @@ def debug_km_mismatch(athlete_id, date):
             )
         ).first()
         
-        # Get activities for that date
-        start_of_day = datetime.combine(target_date, datetime.min.time())
-        end_of_day = start_of_day + timedelta(days=1)
-        
+        # Get activities for that date using date-only comparison
         activities = db.session.query(Activity).filter(
             and_(
                 Activity.athlete_id == athlete_id,
-                Activity.start_date >= start_of_day,
-                Activity.start_date < end_of_day
+                func.date(Activity.start_date) == target_date
             )
         ).all()
         

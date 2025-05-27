@@ -919,7 +919,8 @@ def debug_km_mismatch(athlete_id, date):
         
         # Get athlete info
         athlete = Athlete.query.get(athlete_id)
-        
+        start_of_day = datetime.combine(target_date, datetime.min.time())
+        end_of_day = start_of_day + timedelta(days=1)    
         debug_info = {
             'athlete': {
                 'id': athlete.id,

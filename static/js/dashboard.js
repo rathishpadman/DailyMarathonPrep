@@ -87,15 +87,16 @@ function updateSummaryData(period) {
     // Update active button state
     const periodButtons = document.querySelectorAll('.period-filter');
     periodButtons.forEach(btn => {
-        const btnElement = btn.closest('button');
-        if (btnElement && btnElement.classList) {
-            btnElement.classList.remove('active');
-        }
+        btn.classList.remove('active');
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
     });
 
     const activeButton = document.querySelector(`[data-period="${period}"]`);
-    if (activeButton && activeButton.closest('button') && activeButton.closest('button').classList) {
-        activeButton.closest('button').classList.add('active');
+    if (activeButton) {
+        activeButton.classList.add('active');
+        activeButton.classList.remove('btn-outline-primary');
+        activeButton.classList.add('btn-primary');
     }
 
     // Fetch updated summary data
@@ -139,32 +140,43 @@ function updateSummaryTable(summaryData, period) {
 
     let tableHtml = `
         <div class="table-responsive">
-            <table class="table table-hover">
+            <div id="loadingIndicator" class="text-center py-3" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+            <table class="table table-hover" id="summaryTable">
                 <thead>
                     <tr>
                         <th>Period</th>
-                        <th>Total Planned (km)</th>
-                        <th>Total Actual (km)</th>
-                        <th>Variance</th>
-                        <th>Completion Rate</th>
                         <th>Athletes</th>
+                        <th>Planned (km)</th>
+                        <th>Actual (km)</th>
+                        <th>Completion Rate</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="summaryTableBody">
     `;
 
     summaryData.forEach(item => {
-        const variance = item.total_planned > 0 ? 
-            ((item.total_actual - item.total_planned) / item.total_planned * 100).toFixed(1) : 0;
+        let statusBadge = '';
+        if (item.completion_rate >= 80) {
+            statusBadge = '<span class="badge bg-success">Excellent</span>';
+        } else if (item.completion_rate >= 60) {
+            statusBadge = '<span class="badge bg-warning">Good</span>';
+        } else {
+            statusBadge = '<span class="badge bg-danger">Needs Improvement</span>';
+        }
 
         tableHtml += `
             <tr>
-                <td>${item.period_label}</td>
-                <td>${item.total_planned.toFixed(1)} km</td>
-                <td>${item.total_actual.toFixed(1)} km</td>
-                <td><span class="${variance >= 0 ? 'text-success' : 'text-danger'}">${variance >= 0 ? '+' : ''}${variance}%</span></td>
-                <td>${item.completion_rate.toFixed(1)}%</td>
+                <td>${item.period_label || new Date(item.date).toLocaleDateString()}</td>
                 <td>${item.athletes ? item.athletes.length : 0}</td>
+                <td>${item.total_planned.toFixed(1)}</td>
+                <td>${item.total_actual.toFixed(1)}</td>
+                <td>${item.completion_rate.toFixed(1)}%</td>
+                <td>${statusBadge}</td>
             </tr>
         `;
     });

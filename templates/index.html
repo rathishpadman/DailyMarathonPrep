@@ -87,26 +87,28 @@
                             Training Summary
                         </h5>
                         <div class="btn-group" role="group">
-                            <input type="radio" class="btn-check" name="period" id="day" value="day" {% if current_period == 'day' %}checked{% endif %}>
-                            <label class="btn btn-outline-primary" for="day">Day</label>
-
-                            <input type="radio" class="btn-check" name="period" id="week" value="week" {% if current_period == 'week' %}checked{% endif %}>
-                            <label class="btn btn-outline-primary" for="week">Week</label>
-
-                            <input type="radio" class="btn-check" name="period" id="month" value="month" {% if current_period == 'month' %}checked{% endif %}>
-                            <label class="btn btn-outline-primary" for="month">Month</label>
+                            <button type="button" class="btn btn-outline-primary period-filter {% if current_period == 'day' %}active{% endif %}" data-period="day">
+                                Day
+                            </button>
+                            <button type="button" class="btn btn-outline-primary period-filter {% if current_period == 'week' %}active{% endif %}" data-period="week">
+                                Week
+                            </button>
+                            <button type="button" class="btn btn-outline-primary period-filter {% if current_period == 'month' %}active{% endif %}" data-period="month">
+                                Month
+                            </button>
                         </div>
                     </div>
                 </div>
                 <div class="card-body">
-                    {% if summary_data %}
-                    <div class="table-responsive">
-                        <div id="loadingIndicator" class="text-center py-3" style="display: none;">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
+                    <div id="summaryTableContainer">
+                        {% if summary_data %}
+                        <div class="table-responsive">
+                            <div id="loadingIndicator" class="text-center py-3" style="display: none;">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </div>
-                        </div>
-                        <table class="table table-hover" id="summaryTable">
+                            <table class="table table-hover" id="summaryTable">
                             <thead>
                                 <tr>
                                     <th>Period</th>
@@ -138,17 +140,18 @@
                                 {% endfor %}
                             </tbody>
                         </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-4">
+                            <i data-feather="inbox" style="width: 3rem; height: 3rem;" class="text-muted mb-3"></i>
+                            <p class="text-muted">No training data available for the selected period.</p>
+                            <a href="{{ url_for('sync_activities') }}" class="btn btn-primary">
+                                <i data-feather="refresh-cw" class="me-2"></i>
+                                Sync Activities
+                            </a>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% else %}
-                    <div class="text-center py-4">
-                        <i data-feather="inbox" style="width: 3rem; height: 3rem;" class="text-muted mb-3"></i>
-                        <p class="text-muted">No training data available for the selected period.</p>
-                        <a href="{{ url_for('sync_activities') }}" class="btn btn-primary">
-                            <i data-feather="refresh-cw" class="me-2"></i>
-                            Sync Activities
-                        </a>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -176,85 +179,22 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script>
-// Period filter functionality with AJAX
-document.querySelectorAll('input[name="period"]').forEach(radio => {
-    radio.addEventListener('change', function() {
-        updateSummaryData(this.value);
-    });
-});
-
-// Removed manual sync function - moved to separate page
-// Removed toggleAthlete function as athlete management moved to separate page
-
-function updateSummaryData(period) {
-    // Show loading indicator
-    const loadingIndicator = document.getElementById('loadingIndicator');
-    const summaryTable = document.getElementById('summaryTable');
-    const tableBody = document.getElementById('summaryTableBody');
-
-    loadingIndicator.style.display = 'block';
-    summaryTable.style.opacity = '0.5';
-
-    // Update button states
-    document.querySelectorAll('.btn-group button').forEach(btn => {
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-outline-primary');
-    });
-    document.getElementById(`btn-${period}`).classList.remove('btn-outline-primary');
-    document.getElementById(`btn-${period}`).classList.add('btn-primary');
-
-    fetch(`/api/summary-stats/${period}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                throw new Error(data.error);
-            }
-
-            // Update table body
-            tableBody.innerHTML = '';
-            if (data.summary_data && data.summary_data.length > 0) {
-                data.summary_data.forEach(item => {
-                    const row = document.createElement('tr');
-
-                    let statusBadge = '';
-                    if (item.completion_rate >= 80) {
-                        statusBadge = '<span class="badge bg-success">Excellent</span>';
-                    } else if (item.completion_rate >= 60) {
-                        statusBadge = '<span class="badge bg-warning">Good</span>';
-                    } else {
-                        statusBadge = '<span class="badge bg-danger">Needs Improvement</span>';
-                    }
-
-                    row.innerHTML = `
-                        <td>${item.period_label || new Date(item.date).toLocaleDateString()}</td>
-                        <td>${item.athletes.length}</td>
-                        <td>${item.total_planned.toFixed(1)}</td>
-                        <td>${item.total_actual.toFixed(1)}</td>
-                        <td>${item.completion_rate.toFixed(1)}%</td>
-                        <td>${statusBadge}</td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-            } else {
-                const row = document.createElement('tr');
-                row.innerHTML = '<td colspan="6" class="text-center text-muted">No data available</td>';
-                tableBody.appendChild(row);
-            }
-        })
-        .catch(error => {
-            console.error('Error updating summary data:', error);
-            alert('Error loading summary data: ' + error.message);
-        })
-        .finally(() => {
-            loadingIndicator.style.display = 'none';
-            summaryTable.style.opacity = '1';
-        });
-}
-
-// Initialize dashboard
+// Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Feather icons
     feather.replace();
+    
+    // Setup period filter event listeners for index page
+    const periodButtons = document.querySelectorAll('.period-filter');
+    periodButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const period = this.getAttribute('data-period');
+            updateSummaryData(period);
+        });
+    });
 });
 </script>
 {% endblock %}

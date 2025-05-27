@@ -203,8 +203,8 @@ def get_filtered_summary_data(period='week'):
             
             sorted_dates = sorted(date_groups.keys(), reverse=True)[:10]
             result_data = []
-            for date in sorted_dates:
-                result_data.append(date_groups[date])
+            for date_key in sorted_dates:
+                result_data.append(date_groups[date_key])
             
         elif period == 'week':
             # Define week start as May 19, 2025 (Week 1)
@@ -407,15 +407,18 @@ def get_filtered_summary_data(period='week'):
 
         # Calculate completion rates for all periods
         for period_data in result_data:
-            if period_data['athletes']:
-                completed = len([a for a in period_data['athletes'] if a['status'] in ['On Track', 'Over-performed']])
+            if period_data.get('athletes'):
+                completed = len([a for a in period_data['athletes'] if a.get('status') in ['On Track', 'Over-performed']])
                 total = len(period_data['athletes'])
                 period_data['completion_rate'] = (completed / total * 100) if total > 0 else 0
+            else:
+                period_data['completion_rate'] = 0
 
         return result_data
 
     except Exception as e:
-        logger.error(f"Error getting filtered summary data: {e}")
+        logger.error(f"Error getting filtered summary data: cannot access local variable 'date' where it is not associated with a value")
+        logger.error(f"Full error details: {e}")
         return []
 
 

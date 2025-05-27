@@ -143,10 +143,10 @@
                     <div class="text-center py-4">
                         <i data-feather="inbox" style="width: 3rem; height: 3rem;" class="text-muted mb-3"></i>
                         <p class="text-muted">No training data available for the selected period.</p>
-                        <button class="btn btn-primary" onclick="runManualSync()">
+                        <a href="{{ url_for('sync_activities') }}" class="btn btn-primary">
                             <i data-feather="refresh-cw" class="me-2"></i>
                             Sync Activities
-                        </button>
+                        </a>
                     </div>
                     {% endif %}
                 </div>
@@ -165,10 +165,10 @@
                             <i data-feather="bar-chart" class="me-2"></i>
                             Detailed Dashboard
                         </a>
-                        <button class="btn btn-outline-success" onclick="runManualSync()">
+                        <a href="{{ url_for('sync_activities') }}" class="btn btn-outline-success">
                             <i data-feather="refresh-cw" class="me-2"></i>
-                            Sync All Activities
-                        </button>
+                            Sync Activities
+                        </a>
                     </div>
                 </div>
             </div>
@@ -184,24 +184,7 @@ document.querySelectorAll('input[name="period"]').forEach(radio => {
     });
 });
 
-// Manual sync function
-function runManualSync() {
-    fetch('/api/sync-current', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'}
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Sync completed successfully!');
-            window.location.reload();
-        } else {
-            alert('Sync failed: ' + data.message);
-        }
-    })
-    .catch(error => alert('Error: ' + error.message));
-}
-
+// Removed manual sync function - moved to separate page
 // Removed toggleAthlete function as athlete management moved to separate page
 
 function updateSummaryData(period) {

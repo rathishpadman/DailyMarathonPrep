@@ -1,0 +1,417 @@
+
+{% extends "base.html" %}
+{% block title %}Sync Activities - Marathon Training{% endblock %}
+{% block content %}
+<div class="container">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="refresh-cw" class="me-2"></i>
+                        Sync Activities from Strava
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i data-feather="info" class="me-2"></i>
+                        <strong>Sync Restrictions:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Individual athlete sync: Maximum 7 days per sync</li>
+                            <li>All athletes sync: Only current and previous day allowed</li>
+                            <li>Sync operations may take a few minutes to complete</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Configuration -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Sync Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <form id="syncForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="sync_type" class="form-label">Sync Type</label>
+                                <select class="form-select" id="sync_type" onchange="toggleSyncOptions()">
+                                    <option value="all">All Athletes</option>
+                                    <option value="individual">Individual Athlete</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3" id="athlete_selector" style="display: none;">
+                                <label for="athlete_id" class="form-label">Select Athlete</label>
+                                <select class="form-select" id="athlete_id">
+                                    <option value="">Choose athlete...</option>
+                                    {% for athlete in all_athletes %}
+                                    <option value="{{ athlete.id }}">{{ athlete.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row" id="date_range_container">
+                            <div class="col-md-6 mb-3">
+                                <label for="start_date" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="start_date" 
+                                       value="{{ yesterday.strftime('%Y-%m-%d') }}">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="end_date" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="end_date" 
+                                       value="{{ today.strftime('%Y-%m-%d') }}">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="button" class="btn btn-primary" onclick="performSync()">
+                                    <i data-feather="refresh-cw" class="me-2"></i>
+                                    Start Sync
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+                                    <i data-feather="rotate-ccw" class="me-2"></i>
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- WhatsApp Notification Config -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i data-feather="message-circle" class="me-2"></i>
+                        WhatsApp Notifications
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form id="whatsappForm">
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="enable_notifications" 
+                                       {% if whatsapp_config.enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="enable_notifications">
+                                    Enable WhatsApp Notifications
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="phone_number" class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="phone_number" 
+                                   placeholder="+1234567890" value="{{ whatsapp_config.phone_number or '' }}">
+                            <div class="form-text">Include country code (e.g., +1 for US)</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="api_key" class="form-label">WhatsApp API Key</label>
+                            <input type="password" class="form-control" id="api_key" 
+                                   placeholder="Enter API key" value="{{ whatsapp_config.api_key or '' }}">
+                            <div class="form-text">Get your API key from WhatsApp Business API provider</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="notification_time" class="form-label">Daily Notification Time</label>
+                            <input type="time" class="form-control" id="notification_time" 
+                                   value="{{ whatsapp_config.notification_time or '08:00' }}">
+                        </div>
+                        
+                        <button type="button" class="btn btn-success btn-sm" onclick="saveWhatsAppConfig()">
+                            <i data-feather="save" class="me-1"></i>
+                            Save Config
+                        </button>
+                        
+                        <button type="button" class="btn btn-outline-info btn-sm" onclick="testNotification()">
+                            <i data-feather="send" class="me-1"></i>
+                            Test
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Sync Status</h6>
+                </div>
+                <div class="card-body">
+                    <div id="sync_status" class="alert alert-secondary" style="display: none;">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-3" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span id="status_message">Preparing sync...</span>
+                        </div>
+                    </div>
+                    
+                    <div id="sync_results" style="display: none;">
+                        <h6>Sync Results:</h6>
+                        <ul id="results_list"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Sync History -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Recent Sync History</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Athlete(s)</th>
+                                    <th>Status</th>
+                                    <th>Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sync_history">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleSyncOptions() {
+    const syncType = document.getElementById('sync_type').value;
+    const athleteSelector = document.getElementById('athlete_selector');
+    const startDate = document.getElementById('start_date');
+    const endDate = document.getElementById('end_date');
+    
+    if (syncType === 'individual') {
+        athleteSelector.style.display = 'block';
+        // Allow up to 7 days for individual sync
+        const today = new Date();
+        const sevenDaysAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
+        startDate.min = sevenDaysAgo.toISOString().split('T')[0];
+        startDate.max = today.toISOString().split('T')[0];
+        endDate.min = sevenDaysAgo.toISOString().split('T')[0];
+        endDate.max = today.toISOString().split('T')[0];
+    } else {
+        athleteSelector.style.display = 'none';
+        // Only current and previous day for all athletes
+        const today = new Date();
+        const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+        startDate.min = yesterday.toISOString().split('T')[0];
+        startDate.max = today.toISOString().split('T')[0];
+        endDate.min = yesterday.toISOString().split('T')[0];
+        endDate.max = today.toISOString().split('T')[0];
+        startDate.value = yesterday.toISOString().split('T')[0];
+        endDate.value = today.toISOString().split('T')[0];
+    }
+}
+
+function validateSyncDates() {
+    const syncType = document.getElementById('sync_type').value;
+    const startDate = new Date(document.getElementById('start_date').value);
+    const endDate = new Date(document.getElementById('end_date').value);
+    
+    if (startDate > endDate) {
+        alert('Start date cannot be after end date');
+        return false;
+    }
+    
+    const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    
+    if (syncType === 'individual' && daysDiff > 7) {
+        alert('Individual athlete sync cannot exceed 7 days');
+        return false;
+    }
+    
+    if (syncType === 'all' && daysDiff > 2) {
+        alert('All athletes sync is limited to current and previous day only');
+        return false;
+    }
+    
+    return true;
+}
+
+function performSync() {
+    if (!validateSyncDates()) {
+        return;
+    }
+    
+    const syncType = document.getElementById('sync_type').value;
+    const athleteId = document.getElementById('athlete_id').value;
+    const startDate = document.getElementById('start_date').value;
+    const endDate = document.getElementById('end_date').value;
+    
+    if (syncType === 'individual' && !athleteId) {
+        alert('Please select an athlete for individual sync');
+        return;
+    }
+    
+    // Show sync status
+    const statusDiv = document.getElementById('sync_status');
+    const resultsDiv = document.getElementById('sync_results');
+    statusDiv.style.display = 'block';
+    resultsDiv.style.display = 'none';
+    
+    document.getElementById('status_message').textContent = 'Starting sync operation...';
+    
+    const syncData = {
+        type: syncType,
+        start_date: startDate,
+        end_date: endDate
+    };
+    
+    if (syncType === 'individual') {
+        syncData.athlete_id = athleteId;
+    }
+    
+    fetch('/api/sync-activities', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(syncData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        statusDiv.style.display = 'none';
+        resultsDiv.style.display = 'block';
+        
+        const resultsList = document.getElementById('results_list');
+        resultsList.innerHTML = '';
+        
+        if (data.success) {
+            const li = document.createElement('li');
+            li.className = 'text-success';
+            li.innerHTML = `<i data-feather="check-circle"></i> ${data.message}`;
+            resultsList.appendChild(li);
+            
+            if (data.details) {
+                data.details.forEach(detail => {
+                    const detailLi = document.createElement('li');
+                    detailLi.className = 'text-info small';
+                    detailLi.textContent = detail;
+                    resultsList.appendChild(detailLi);
+                });
+            }
+        } else {
+            const li = document.createElement('li');
+            li.className = 'text-danger';
+            li.innerHTML = `<i data-feather="x-circle"></i> ${data.message}`;
+            resultsList.appendChild(li);
+        }
+        
+        feather.replace();
+        loadSyncHistory();
+    })
+    .catch(error => {
+        statusDiv.style.display = 'none';
+        resultsDiv.style.display = 'block';
+        
+        const resultsList = document.getElementById('results_list');
+        resultsList.innerHTML = '<li class="text-danger">Sync failed: ' + error.message + '</li>';
+    });
+}
+
+function saveWhatsAppConfig() {
+    const config = {
+        enabled: document.getElementById('enable_notifications').checked,
+        phone_number: document.getElementById('phone_number').value,
+        api_key: document.getElementById('api_key').value,
+        notification_time: document.getElementById('notification_time').value
+    };
+    
+    fetch('/api/whatsapp-config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('WhatsApp configuration saved successfully!');
+        } else {
+            alert('Failed to save configuration: ' + data.message);
+        }
+    })
+    .catch(error => alert('Error: ' + error.message));
+}
+
+function testNotification() {
+    fetch('/api/test-whatsapp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Test notification sent successfully!');
+        } else {
+            alert('Test failed: ' + data.message);
+        }
+    })
+    .catch(error => alert('Error: ' + error.message));
+}
+
+function resetForm() {
+    document.getElementById('syncForm').reset();
+    document.getElementById('sync_type').value = 'all';
+    toggleSyncOptions();
+    
+    const today = new Date();
+    const yesterday = new Date(today.getTime() - (24 * 60 * 60 * 1000));
+    document.getElementById('start_date').value = yesterday.toISOString().split('T')[0];
+    document.getElementById('end_date').value = today.toISOString().split('T')[0];
+}
+
+function loadSyncHistory() {
+    fetch('/api/sync-history')
+    .then(response => response.json())
+    .then(data => {
+        const tbody = document.getElementById('sync_history');
+        tbody.innerHTML = '';
+        
+        data.forEach(sync => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${new Date(sync.timestamp).toLocaleString()}</td>
+                <td>${sync.type}</td>
+                <td>${sync.athletes}</td>
+                <td><span class="badge bg-${sync.status === 'success' ? 'success' : 'danger'}">${sync.status}</span></td>
+                <td>${sync.duration}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    })
+    .catch(error => console.error('Error loading sync history:', error));
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    feather.replace();
+    toggleSyncOptions();
+    loadSyncHistory();
+});
+</script>
+{% endblock %}

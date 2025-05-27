@@ -54,6 +54,23 @@ def index():
         weekly_planned = sum(s.planned_distance_km or 0 for s in unique_summaries.values())
         weekly_actual = sum(s.actual_distance_km or 0 for s in unique_summaries.values())
 
+        # If no daily summaries, try to get planned workouts directly
+        if weekly_planned == 0:
+            planned_workouts = db.session.query(PlannedWorkout).join(Athlete).filter(
+                PlannedWorkout.workout_date >= week_ago.date(),
+                PlannedWorkout.workout_date <= datetime.now().date(),
+                Athlete.is_active == True
+            ).all()
+            
+            # Remove duplicates by athlete_id and date
+            unique_planned = {}
+            for workout in planned_workouts:
+                key = f"{workout.athlete_id}_{workout.workout_date}"
+                if key not in unique_planned:
+                    unique_planned[key] = workout
+            
+            weekly_planned = sum(w.planned_distance_km or 0 for w in unique_planned.values())
+
         # Get all athletes for management
         all_athletes = db.session.query(Athlete).order_by(Athlete.name).all()
 
@@ -514,6 +531,36 @@ def athletes():
         return redirect(url_for('index'))
 
 
+@app.route('/sync-activities')
+def sync_activities():
+    """Sync activities page with filtering and WhatsApp config"""
+    try:
+        # Get all active athletes
+        all_athletes = db.session.query(Athlete).filter_by(is_active=True).order_by(Athlete.name).all()
+        
+        # Get current WhatsApp configuration (placeholder for now)
+        whatsapp_config = {
+            'enabled': False,
+            'phone_number': '',
+            'api_key': '',
+            'notification_time': '08:00'
+        }
+        
+        # Set date defaults
+        today = datetime.now()
+        yesterday = today - timedelta(days=1)
+        
+        return render_template('sync_activities.html',
+                               all_athletes=all_athletes,
+                               whatsapp_config=whatsapp_config,
+                               today=today,
+                               yesterday=yesterday)
+                               
+    except Exception as e:
+        logger.error(f"Error loading sync activities page: {e}")
+        flash(f"Error loading page: {e}", "error")
+        return redirect(url_for('index'))
+
 @app.route('/training-plan')
 def training_plan():
     """Training plan management page"""
@@ -861,6 +908,208 @@ def sync_current():
         error_msg = f"Error during sync: {e}"
         logger.error(error_msg)
         return jsonify({"success": False, "message": error_msg})
+
+
+@app.route('/api/sync-activities', methods=['POST'])
+def api_sync_activities():
+    """API endpoint for filtered sync activities"""
+    try:
+        data = request.get_json()
+        sync_type = data.get('type', 'all')
+        start_date_str = data.get('start_date')
+        end_date_str = data.get('end_date')
+        athlete_id = data.get('athlete_id')
+        
+        # Parse dates
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+        
+        # Validate date range
+        days_diff = (end_date - start_date).days + 1
+        
+        if sync_type == 'individual':
+            if not athlete_id:
+                return jsonify({"success": False, "message": "Athlete ID required for individual sync"})
+            if days_diff > 7:
+                return jsonify({"success": False, "message": "Individual sync limited to 7 days"})
+        elif sync_type == 'all':
+            if days_diff > 2:
+                return jsonify({"success": False, "message": "All athletes sync limited to 2 days"})
+        
+        # Perform sync
+        from scheduler import sync_athlete_activities, process_daily_performance
+        
+        sync_results = []
+        
+        if sync_type == 'individual':
+            athlete = Athlete.query.get(athlete_id)
+            if not athlete:
+                return jsonify({"success": False, "message": "Athlete not found"})
+                
+            # Sync activities for the date range
+            current_date = start_date
+            while current_date <= end_date:
+                try:
+                    activities_count = sync_athlete_activities(athlete, current_date)
+                    process_daily_performance(athlete.id, current_date)
+                    sync_results.append(f"{athlete.name} - {current_date.strftime('%Y-%m-%d')}: {activities_count} activities")
+                except Exception as e:
+                    sync_results.append(f"{athlete.name} - {current_date.strftime('%Y-%m-%d')}: Error - {str(e)}")
+                current_date += timedelta(days=1)
+                
+        else:  # all athletes
+            athletes = db.session.query(Athlete).filter_by(is_active=True).all()
+            current_date = start_date
+            while current_date <= end_date:
+                day_total = 0
+                for athlete in athletes:
+                    try:
+                        activities_count = sync_athlete_activities(athlete, current_date)
+                        process_daily_performance(athlete.id, current_date)
+                        day_total += activities_count
+                    except Exception as e:
+                        logger.error(f"Error syncing {athlete.name} for {current_date}: {e}")
+                sync_results.append(f"All athletes - {current_date.strftime('%Y-%m-%d')}: {day_total} total activities")
+                current_date += timedelta(days=1)
+        
+        # Log sync operation
+        log_sync_operation(sync_type, start_date_str, end_date_str, athlete_id, True, sync_results)
+        
+        return jsonify({
+            "success": True, 
+            "message": f"Sync completed successfully for {sync_type} from {start_date_str} to {end_date_str}",
+            "details": sync_results
+        })
+        
+    except Exception as e:
+        error_msg = f"Sync failed: {str(e)}"
+        logger.error(error_msg)
+        
+        # Log failed sync operation
+        log_sync_operation(
+            data.get('type', 'unknown') if 'data' in locals() else 'unknown',
+            data.get('start_date', '') if 'data' in locals() else '',
+            data.get('end_date', '') if 'data' in locals() else '',
+            data.get('athlete_id') if 'data' in locals() else None,
+            False,
+            [error_msg]
+        )
+        
+        return jsonify({"success": False, "message": error_msg})
+
+
+@app.route('/api/whatsapp-config', methods=['POST'])
+def api_whatsapp_config():
+    """API endpoint to save WhatsApp configuration"""
+    try:
+        config = request.get_json()
+        
+        # Store configuration in database or config file
+        # For now, we'll use a simple file-based storage
+        import json
+        config_file = 'whatsapp_config.json'
+        
+        with open(config_file, 'w') as f:
+            json.dump(config, f)
+        
+        logger.info("WhatsApp configuration saved successfully")
+        return jsonify({"success": True, "message": "Configuration saved successfully"})
+        
+    except Exception as e:
+        error_msg = f"Failed to save WhatsApp configuration: {str(e)}"
+        logger.error(error_msg)
+        return jsonify({"success": False, "message": error_msg})
+
+
+@app.route('/api/test-whatsapp', methods=['POST'])
+def api_test_whatsapp():
+    """API endpoint to test WhatsApp notification"""
+    try:
+        # Load WhatsApp configuration
+        import json
+        config_file = 'whatsapp_config.json'
+        
+        try:
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+        except FileNotFoundError:
+            return jsonify({"success": False, "message": "WhatsApp configuration not found"})
+        
+        if not config.get('enabled', False):
+            return jsonify({"success": False, "message": "WhatsApp notifications are disabled"})
+        
+        # Send test message using the notifier
+        from notifier import WhatsAppNotifier
+        notifier = WhatsAppNotifier()
+        
+        test_message = f"🧪 Test notification from Marathon Dashboard\n📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n✅ Configuration is working correctly!"
+        
+        success = notifier.send_message(config.get('phone_number'), test_message)
+        
+        if success:
+            return jsonify({"success": True, "message": "Test notification sent successfully"})
+        else:
+            return jsonify({"success": False, "message": "Failed to send test notification"})
+        
+    except Exception as e:
+        error_msg = f"Test notification failed: {str(e)}"
+        logger.error(error_msg)
+        return jsonify({"success": False, "message": error_msg})
+
+
+@app.route('/api/sync-history')
+def api_sync_history():
+    """API endpoint to get sync history"""
+    try:
+        # Read sync history from logs or database
+        history = []
+        
+        # Get recent system logs related to sync operations
+        recent_logs = db.session.query(SystemLog).filter(
+            SystemLog.log_type.in_(['SYNC_SUCCESS', 'SYNC_FAILED'])
+        ).order_by(SystemLog.created_at.desc()).limit(10).all()
+        
+        for log in recent_logs:
+            history.append({
+                'timestamp': log.created_at.isoformat(),
+                'type': 'All Athletes' if 'all' in log.message.lower() else 'Individual',
+                'athletes': 'Multiple' if 'all' in log.message.lower() else 'Single',
+                'status': 'success' if log.log_type == 'SYNC_SUCCESS' else 'failed',
+                'duration': 'N/A'  # Could be calculated if we store start/end times
+            })
+        
+        return jsonify(history)
+        
+    except Exception as e:
+        logger.error(f"Error getting sync history: {e}")
+        return jsonify([])
+
+
+def log_sync_operation(sync_type, start_date, end_date, athlete_id, success, details):
+    """Log sync operation to system logs"""
+    try:
+        athlete_name = "All Athletes"
+        if athlete_id:
+            athlete = Athlete.query.get(athlete_id)
+            athlete_name = athlete.name if athlete else f"Athlete {athlete_id}"
+        
+        log_type = "SYNC_SUCCESS" if success else "SYNC_FAILED"
+        message = f"Sync {sync_type} - {athlete_name} ({start_date} to {end_date})"
+        details_str = "; ".join(details) if details else ""
+        
+        system_log = SystemLog(
+            log_date=datetime.now(),
+            log_type=log_type,
+            message=message,
+            details=details_str
+        )
+        
+        db.session.add(system_log)
+        db.session.commit()
+        
+    except Exception as e:
+        logger.error(f"Failed to log sync operation: {e}")
+        db.session.rollback()
 
 
 @app.route('/api/summary-stats/<period>')

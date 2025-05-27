@@ -106,55 +106,105 @@ def get_filtered_summary_data(period='week'):
     """Get summary data filtered by period with aggregated planned vs actual"""
     try:
         end_date = datetime.now()
+        start_date = datetime(2025, 5, 19)  # Base date for data
         
         if period == 'day':
-            # Get latest 10 days with distinct athlete summaries
+            # Get date range for last 10 days, but ensure we include planned data from May 23rd
+            date_range_start = max(start_date.date(), (end_date - timedelta(days=30)).date())
+            
+            # Get all planned workouts and daily summaries for the date range
+            planned_workouts = db.session.query(PlannedWorkout).join(Athlete).filter(
+                PlannedWorkout.workout_date >= date_range_start,
+                PlannedWorkout.workout_date <= end_date.date(),
+                Athlete.is_active == True
+            ).all()
+            
             summaries = db.session.query(DailySummary).join(Athlete).filter(
+                DailySummary.summary_date >= date_range_start,
                 DailySummary.summary_date <= end_date.date(),
                 Athlete.is_active == True
-            ).order_by(DailySummary.summary_date.desc()).all()
+            ).all()
             
-            # Group by individual dates with unique athletes
+            # Create comprehensive date groups including all planned data
             date_groups = {}
-            for summary in summaries:
-                # Convert summary_date to proper date if it's datetime
-                if hasattr(summary.summary_date, 'date'):
-                    summary_date = summary.summary_date.date()
-                else:
-                    summary_date = summary.summary_date
+            
+            # First, populate with planned workouts
+            for workout in planned_workouts:
+                workout_date = workout.workout_date if isinstance(workout.workout_date, date) else workout.workout_date.date()
+                date_key = workout_date.strftime('%Y-%m-%d')
+                
+                if date_key not in date_groups:
+                    date_groups[date_key] = {
+                        'date': workout_date,
+                        'period_label': workout_date.strftime('%d %b %Y'),
+                        'athletes': [],
+                        'athlete_data': {},  # Track by athlete_id
+                        'total_planned': 0,
+                        'total_actual': 0,
+                        'completion_rate': 0
+                    }
+                
+                athlete = Athlete.query.get(workout.athlete_id)
+                if athlete and athlete.is_active:
+                    athlete_key = workout.athlete_id
+                    if athlete_key not in date_groups[date_key]['athlete_data']:
+                        date_groups[date_key]['athlete_data'][athlete_key] = {
+                            'name': athlete.name,
+                            'planned': 0,
+                            'actual': 0,
+                            'status': 'Planned'
+                        }
                     
+                    date_groups[date_key]['athlete_data'][athlete_key]['planned'] += workout.planned_distance_km or 0
+                    date_groups[date_key]['total_planned'] += workout.planned_distance_km or 0
+            
+            # Then, overlay with actual summary data
+            for summary in summaries:
+                summary_date = summary.summary_date if isinstance(summary.summary_date, date) else summary.summary_date.date()
                 date_key = summary_date.strftime('%Y-%m-%d')
+                
                 if date_key not in date_groups:
                     date_groups[date_key] = {
                         'date': summary_date,
                         'period_label': summary_date.strftime('%d %b %Y'),
                         'athletes': [],
-                        'athlete_ids': set(),  # Track unique athlete IDs
+                        'athlete_data': {},
                         'total_planned': 0,
                         'total_actual': 0,
                         'completion_rate': 0
                     }
-
-                # Only add if athlete hasn't been added for this date
-                if summary.athlete_id not in date_groups[date_key]['athlete_ids']:
-                    athlete = Athlete.query.get(summary.athlete_id)
-                    date_groups[date_key]['athletes'].append({
-                        'name': athlete.name if athlete else 'Unknown',
-                        'planned': summary.planned_distance_km or 0,
-                        'actual': summary.actual_distance_km or 0,
-                        'status': summary.status
-                    })
-                    date_groups[date_key]['athlete_ids'].add(summary.athlete_id)
-                    date_groups[date_key]['total_planned'] += summary.planned_distance_km or 0
+                
+                athlete = Athlete.query.get(summary.athlete_id)
+                if athlete and athlete.is_active:
+                    athlete_key = summary.athlete_id
+                    if athlete_key not in date_groups[date_key]['athlete_data']:
+                        date_groups[date_key]['athlete_data'][athlete_key] = {
+                            'name': athlete.name,
+                            'planned': summary.planned_distance_km or 0,
+                            'actual': summary.actual_distance_km or 0,
+                            'status': summary.status
+                        }
+                        date_groups[date_key]['total_planned'] += summary.planned_distance_km or 0
+                    else:
+                        # Update existing data with actual values
+                        date_groups[date_key]['athlete_data'][athlete_key]['actual'] = summary.actual_distance_km or 0
+                        date_groups[date_key]['athlete_data'][athlete_key]['status'] = summary.status
+                        # Only update planned if not already set from workout
+                        if date_groups[date_key]['athlete_data'][athlete_key]['planned'] == 0:
+                            date_groups[date_key]['athlete_data'][athlete_key]['planned'] = summary.planned_distance_km or 0
+                            date_groups[date_key]['total_planned'] += summary.planned_distance_km or 0
+                    
                     date_groups[date_key]['total_actual'] += summary.actual_distance_km or 0
             
-            # Clean up athlete_ids from final data and get latest 10 unique dates
+            # Convert athlete_data to athletes list and get latest 10 dates
+            for date_key in date_groups:
+                date_groups[date_key]['athletes'] = list(date_groups[date_key]['athlete_data'].values())
+                date_groups[date_key].pop('athlete_data', None)
+            
             sorted_dates = sorted(date_groups.keys(), reverse=True)[:10]
             result_data = []
             for date in sorted_dates:
-                data = date_groups[date]
-                data.pop('athlete_ids', None)  # Remove tracking set
-                result_data.append(data)
+                result_data.append(date_groups[date])
             
         elif period == 'week':
             # Define week start as May 19, 2025 (Week 1)
@@ -174,7 +224,13 @@ def get_filtered_summary_data(period='week'):
                 week_start = base_date + timedelta(weeks=week_num)
                 week_end = week_start + timedelta(days=6)
                 
-                # Get summaries for this week
+                # Get both planned workouts and summaries for this week
+                week_planned = db.session.query(PlannedWorkout).join(Athlete).filter(
+                    PlannedWorkout.workout_date >= week_start,
+                    PlannedWorkout.workout_date <= week_end,
+                    Athlete.is_active == True
+                ).all()
+                
                 week_summaries = db.session.query(DailySummary).join(Athlete).filter(
                     DailySummary.summary_date >= week_start,
                     DailySummary.summary_date <= week_end,
@@ -191,25 +247,49 @@ def get_filtered_summary_data(period='week'):
                     'completion_rate': 0
                 }
                 
-                # Aggregate weekly data
+                # Aggregate weekly data starting with planned workouts
                 athlete_weekly_data = {}
+                
+                # First, add all planned workouts
+                for workout in week_planned:
+                    athlete_id = workout.athlete_id
+                    if athlete_id not in athlete_weekly_data:
+                        athlete = Athlete.query.get(athlete_id)
+                        if athlete and athlete.is_active:
+                            athlete_weekly_data[athlete_id] = {
+                                'name': athlete.name,
+                                'planned': 0,
+                                'actual': 0,
+                                'completed_days': 0,
+                                'total_days': 0
+                            }
+                    
+                    if athlete_id in athlete_weekly_data:
+                        athlete_weekly_data[athlete_id]['planned'] += workout.planned_distance_km or 0
+                
+                # Then, overlay with actual summary data
                 for summary in week_summaries:
                     athlete_id = summary.athlete_id
                     if athlete_id not in athlete_weekly_data:
                         athlete = Athlete.query.get(athlete_id)
-                        athlete_weekly_data[athlete_id] = {
-                            'name': athlete.name if athlete else 'Unknown',
-                            'planned': 0,
-                            'actual': 0,
-                            'completed_days': 0,
-                            'total_days': 0
-                        }
+                        if athlete and athlete.is_active:
+                            athlete_weekly_data[athlete_id] = {
+                                'name': athlete.name,
+                                'planned': summary.planned_distance_km or 0,
+                                'actual': 0,
+                                'completed_days': 0,
+                                'total_days': 0
+                            }
                     
-                    athlete_weekly_data[athlete_id]['planned'] += summary.planned_distance_km or 0
-                    athlete_weekly_data[athlete_id]['actual'] += summary.actual_distance_km or 0
-                    athlete_weekly_data[athlete_id]['total_days'] += 1
-                    if summary.status in ['On Track', 'Over-performed']:
-                        athlete_weekly_data[athlete_id]['completed_days'] += 1
+                    if athlete_id in athlete_weekly_data:
+                        # Update planned only if it wasn't set from workout data
+                        if athlete_weekly_data[athlete_id]['planned'] == 0:
+                            athlete_weekly_data[athlete_id]['planned'] += summary.planned_distance_km or 0
+                        
+                        athlete_weekly_data[athlete_id]['actual'] += summary.actual_distance_km or 0
+                        athlete_weekly_data[athlete_id]['total_days'] += 1
+                        if summary.status in ['On Track', 'Over-performed']:
+                            athlete_weekly_data[athlete_id]['completed_days'] += 1
                 
                 # Calculate totals and completion rates
                 for athlete_data in athlete_weekly_data.values():
@@ -219,10 +299,10 @@ def get_filtered_summary_data(period='week'):
                     athlete_data['status'] = 'On Track' if completion_rate >= 80 else 'Needs Improvement'
                     week_groups[week_key]['athletes'].append(athlete_data)
             
-            result_data = [week_groups[key] for key in sorted(week_groups.keys()) if week_groups[key]['athletes']][-10:]
+            result_data = [week_groups[key] for key in sorted(week_groups.keys()) if week_groups[key]['total_planned'] > 0 or week_groups[key]['athletes']][-10:]
             
         else:  # month
-            # Get monthly data with May-25 format
+            # Get monthly data with May-25 format, starting from May 2025
             month_groups = {}
             current_year = end_date.year
             current_month = end_date.month
@@ -235,13 +315,23 @@ def get_filtered_summary_data(period='week'):
                     month_num += 12
                     month_year -= 1
                 
+                # Skip months before May 2025 (when data starts)
+                if month_year < 2025 or (month_year == 2025 and month_num < 5):
+                    continue
+                
                 month_start = datetime(month_year, month_num, 1).date()
                 if month_num == 12:
                     month_end = datetime(month_year + 1, 1, 1).date() - timedelta(days=1)
                 else:
                     month_end = datetime(month_year, month_num + 1, 1).date() - timedelta(days=1)
                 
-                # Get summaries for this month (only active athletes)
+                # Get both planned workouts and summaries for this month
+                month_planned = db.session.query(PlannedWorkout).join(Athlete).filter(
+                    PlannedWorkout.workout_date >= month_start,
+                    PlannedWorkout.workout_date <= month_end,
+                    Athlete.is_active == True
+                ).all()
+                
                 month_summaries = db.session.query(DailySummary).join(Athlete).filter(
                     DailySummary.summary_date >= month_start,
                     DailySummary.summary_date <= month_end,
@@ -261,25 +351,49 @@ def get_filtered_summary_data(period='week'):
                     'completion_rate': 0
                 }
                 
-                # Aggregate monthly data by athlete
+                # Aggregate monthly data by athlete starting with planned workouts
                 athlete_monthly_data = {}
+                
+                # First, add all planned workouts
+                for workout in month_planned:
+                    athlete_id = workout.athlete_id
+                    if athlete_id not in athlete_monthly_data:
+                        athlete = Athlete.query.get(athlete_id)
+                        if athlete and athlete.is_active:
+                            athlete_monthly_data[athlete_id] = {
+                                'name': athlete.name,
+                                'planned': 0,
+                                'actual': 0,
+                                'completed_days': 0,
+                                'total_days': 0
+                            }
+                    
+                    if athlete_id in athlete_monthly_data:
+                        athlete_monthly_data[athlete_id]['planned'] += workout.planned_distance_km or 0
+                
+                # Then, overlay with actual summary data
                 for summary in month_summaries:
                     athlete_id = summary.athlete_id
                     if athlete_id not in athlete_monthly_data:
                         athlete = Athlete.query.get(athlete_id)
-                        athlete_monthly_data[athlete_id] = {
-                            'name': athlete.name if athlete else 'Unknown',
-                            'planned': 0,
-                            'actual': 0,
-                            'completed_days': 0,
-                            'total_days': 0
-                        }
+                        if athlete and athlete.is_active:
+                            athlete_monthly_data[athlete_id] = {
+                                'name': athlete.name,
+                                'planned': summary.planned_distance_km or 0,
+                                'actual': 0,
+                                'completed_days': 0,
+                                'total_days': 0
+                            }
                     
-                    athlete_monthly_data[athlete_id]['planned'] += summary.planned_distance_km or 0
-                    athlete_monthly_data[athlete_id]['actual'] += summary.actual_distance_km or 0
-                    athlete_monthly_data[athlete_id]['total_days'] += 1
-                    if summary.status in ['On Track', 'Over-performed']:
-                        athlete_monthly_data[athlete_id]['completed_days'] += 1
+                    if athlete_id in athlete_monthly_data:
+                        # Update planned only if it wasn't set from workout data
+                        if athlete_monthly_data[athlete_id]['planned'] == 0:
+                            athlete_monthly_data[athlete_id]['planned'] += summary.planned_distance_km or 0
+                        
+                        athlete_monthly_data[athlete_id]['actual'] += summary.actual_distance_km or 0
+                        athlete_monthly_data[athlete_id]['total_days'] += 1
+                        if summary.status in ['On Track', 'Over-performed']:
+                            athlete_monthly_data[athlete_id]['completed_days'] += 1
                 
                 # Calculate totals and completion rates
                 for athlete_data in athlete_monthly_data.values():
@@ -289,7 +403,7 @@ def get_filtered_summary_data(period='week'):
                     athlete_data['status'] = 'On Track' if completion_rate >= 80 else 'Needs Improvement'
                     month_groups[month_key]['athletes'].append(athlete_data)
             
-            result_data = [month_groups[key] for key in sorted(month_groups.keys()) if month_groups[key]['athletes']][-10:]
+            result_data = [month_groups[key] for key in sorted(month_groups.keys()) if month_groups[key]['total_planned'] > 0 or month_groups[key]['athletes']][-10:]
 
         # Calculate completion rates for all periods
         for period_data in result_data:

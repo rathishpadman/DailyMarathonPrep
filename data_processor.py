@@ -312,6 +312,47 @@ class DataProcessor:
             }
 
     # FIX: Add method to clean up duplicate summaries
+    def cleanup_duplicate_workouts(self) -> int:
+        """Remove duplicate planned workouts, keeping the most recent one"""
+        try:
+            from sqlalchemy import func
+            
+            # Find all duplicate groups
+            duplicates_query = db.session.query(
+                PlannedWorkout.athlete_id,
+                func.date(PlannedWorkout.workout_date).label('workout_date'),
+                func.count(PlannedWorkout.id).label('count')
+            ).group_by(
+                PlannedWorkout.athlete_id,
+                func.date(PlannedWorkout.workout_date)
+            ).having(func.count(PlannedWorkout.id) > 1).all()
+
+            total_removed = 0
+            
+            for dup in duplicates_query:
+                # Get all records for this athlete/date combination
+                duplicate_records = db.session.query(PlannedWorkout).filter(
+                    PlannedWorkout.athlete_id == dup.athlete_id,
+                    func.date(PlannedWorkout.workout_date) == dup.workout_date
+                ).order_by(PlannedWorkout.id.desc()).all()
+                
+                if len(duplicate_records) > 1:
+                    # Keep the first one (highest ID), delete the rest
+                    for record in duplicate_records[1:]:
+                        db.session.delete(record)
+                        total_removed += 1
+            
+            if total_removed > 0:
+                db.session.commit()
+                logger.info(f"Removed {total_removed} duplicate planned workouts")
+            
+            return total_removed
+            
+        except Exception as e:
+            logger.error(f"Failed to cleanup duplicate workouts: {e}")
+            db.session.rollback()
+            return 0
+
     def cleanup_duplicate_summaries(self, target_date: datetime = None) -> int:
         """Remove duplicate daily summaries for a given date or all dates"""
         try:

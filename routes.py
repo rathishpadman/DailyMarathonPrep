@@ -1,6 +1,6 @@
 from flask import render_template, request, redirect, url_for, flash, jsonify
 from datetime import datetime, timedelta
-from sqlalchemy import func, distinct
+from sqlalchemy import and_, func, distinct
 from app import app, db
 from models import Athlete, Activity, PlannedWorkout, DailySummary, SystemLog
 from strava_client import StravaClient

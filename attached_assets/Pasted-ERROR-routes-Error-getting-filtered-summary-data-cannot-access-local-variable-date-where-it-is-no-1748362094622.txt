@@ -1,0 +1,20 @@
+ERROR:routes:Error getting filtered summary data: cannot access local variable 'date' where it is not associated with a value
+INFO:werkzeug:10.84.4.28 - - [27/May/2025 16:05:06] "GET /api/summary-stats/day HTTP/1.1" 200 -
+ERROR:routes:Error getting filtered summary data: cannot access local variable 'date' where it is not associated with a value
+INFO:werkzeug:10.84.5.2 - - [27/May/2025 16:05:06] "GET /api/summary-stats/day HTTP/1.1" 200 -
+INFO:werkzeug:10.84.6.2 - - [27/May/2025 16:05:10] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:10.84.5.2 - - [27/May/2025 16:05:10] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:10.84.4.28 - - [27/May/2025 16:05:10] "GET /static/css/styles.css HTTP/1.1" 304 -
+INFO:werkzeug:10.84.5.2 - - [27/May/2025 16:05:10] "GET /static/js/dashboard.js HTTP/1.1" 304 -
+ERROR:routes:Error getting filtered summary data: cannot access local variable 'date' where it is not associated with a value
+INFO:werkzeug:10.84.4.28 - - [27/May/2025 16:05:12] "GET /api/summary-stats/day HTTP/1.1" 200 -
+ERROR:routes:Error getting filtered summary data: cannot access local variable 'date' where it is not associated with a value
+INFO:werkzeug:10.84.5.2 - - [27/May/2025 16:05:12] "GET /api/summary-stats/day HTTP/1.1" 200 -
+INFO:werkzeug:10.84.5.2 - - [27/May/2025 16:05:14] "GET /api/summary-stats/week HTTP/1.1" 200 -
+INFO:werkzeug:10.84.4.28 - - [27/May/2025 16:05:14] "GET /api/summary-stats/week HTTP/1.1" 200 -
+INFO:werkzeug:10.84.4.28 - - [27/May/2025 16:05:14] "GET /api/summary-stats/month HTTP/1.1" 200 -
+INFO:werkzeug:10.84.5.2 - - [27/May/2025 16:05:14] "GET /api/summary-stats/month HTTP/1.1" 200 -
+ERROR:routes:Error getting filtered summary data: cannot access local variable 'date' where it is not associated with a value
+INFO:werkzeug:10.84.5.2 - - [27/May/2025 16:05:15] "GET /api/summary-stats/day HTTP/1.1" 200 -
+ERROR:routes:Error getting filtered summary data: cannot access local variable 'date' where it is not associated with a value
+INFO:werkzeug:10.84.4.28 - - [27/May/2025 16:05:15] "GET /api/summary-stats/day HTTP/1.1" 200 -

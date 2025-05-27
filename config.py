@@ -19,6 +19,18 @@ class Config:
     WHATSAPP_GROUP_ID = os.getenv("WHATSAPP_GROUP_ID")
     WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 
+    # Twilio Configuration (for WhatsApp Business API)
+    TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+    TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER")
+
+    # Email Configuration (fallback)
+    SMTP_SERVER = os.getenv("SMTP_SERVER")
+    SMTP_PORT = os.getenv("SMTP_PORT", 587)
+    EMAIL_USER = os.getenv("EMAIL_USER")
+    EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+    RECIPIENT_EMAILS = os.getenv("RECIPIENT_EMAILS", "").split(",") if os.getenv("RECIPIENT_EMAILS") else []
+
     # File Paths
     TRAINING_PLAN_FILE = os.getenv("TRAINING_PLAN_FILE", "uploaded_training_plan.csv")
 

@@ -38,10 +38,10 @@ class WhatsAppNotifier:
         except FileNotFoundError:
             # Fallback to environment variables
             return {
-                'enabled': bool(Config.TWILIO_ACCOUNT_SID),
-                'api_key': Config.TWILIO_ACCOUNT_SID,
-                'auth_token': Config.TWILIO_AUTH_TOKEN,
-                'phone_number': Config.TWILIO_WHATSAPP_NUMBER,
+                'enabled': bool(getattr(Config, 'TWILIO_ACCOUNT_SID', None)),
+                'api_key': getattr(Config, 'TWILIO_ACCOUNT_SID', None),
+                'auth_token': getattr(Config, 'TWILIO_AUTH_TOKEN', None),
+                'phone_number': getattr(Config, 'TWILIO_WHATSAPP_NUMBER', None),
                 'provider': 'twilio'
             }
 

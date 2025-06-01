@@ -76,6 +76,75 @@
         </div>
     </div>
 
+    <!-- Leader Dashboard -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="award" class="me-2"></i>
+                        Leader Dashboard
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if leader_dashboard %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Athlete</th>
+                                    <th>Total Distance (km)</th>
+                                    <th>Previous Week</th>
+                                    <th>Completion Rate</th>
+                                    <th>Status</th>
+                                    <th>Last Activity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for athlete in leader_dashboard %}
+                                <tr>
+                                    <td>
+                                        {% if loop.index == 1 %}
+                                            <i data-feather="award" class="text-warning"></i>
+                                        {% elif loop.index == 2 %}
+                                            <i data-feather="medal" class="text-secondary"></i>
+                                        {% elif loop.index == 3 %}
+                                            <i data-feather="award" class="text-warning"></i>
+                                        {% else %}
+                                            {{ loop.index }}
+                                        {% endif %}
+                                    </td>
+                                    <td><strong>{{ athlete.athlete_name }}</strong></td>
+                                    <td>{{ athlete.total_actual_km }} km</td>
+                                    <td>{{ athlete.prev_week_actual }} / {{ athlete.prev_week_planned }} km</td>
+                                    <td>{{ athlete.prev_week_completion_rate }}%</td>
+                                    <td>
+                                        {% if athlete.status == 'On Track' %}
+                                            <span class="badge bg-success">{{ athlete.status }}</span>
+                                        {% elif athlete.status == 'Fair' %}
+                                            <span class="badge bg-warning">{{ athlete.status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">{{ athlete.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ athlete.latest_activity_date }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i data-feather="inbox" style="width: 3rem; height: 3rem;" class="text-muted mb-3"></i>
+                        <p class="text-muted">No athlete data available.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Summary Table with Filters -->
     <div class="row mb-4">
         <div class="col-12">
@@ -171,6 +240,10 @@
                         <a href="{{ url_for('sync_activities') }}" class="btn btn-outline-success">
                             <i data-feather="refresh-cw" class="me-2"></i>
                             Sync Activities
+                        </a>
+                        <a href="{{ url_for('training_plan') }}" class="btn btn-outline-info">
+                            <i data-feather="calendar" class="me-2"></i>
+                            Training Plan
                         </a>
                     </div>
                 </div>

@@ -1,7 +1,7 @@
 // Dashboard JavaScript functionality for Marathon Training Dashboard
 
 // Global variables
-let chartInstances = {};
+var chartInstances = chartInstances || {};
 
 // Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {

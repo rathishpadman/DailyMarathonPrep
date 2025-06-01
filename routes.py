@@ -790,19 +790,25 @@ def training_plan():
         # Validate Excel file
         validation_results = excel_reader.validate_excel_format()
 
-        # FIX: Get recent planned workouts with distinct constraint
+        # Get recent planned workouts (last 7 days) without duplicates
         week_ago = datetime.now() - timedelta(days=7)
-        recent_workouts = db.session.query(PlannedWorkout).filter(
-            PlannedWorkout.workout_date >= week_ago.date()).order_by(
-                PlannedWorkout.workout_date.desc(),
-                PlannedWorkout.athlete_id).distinct().limit(20).all()
+        recent_workouts = db.session.query(PlannedWorkout).join(Athlete).filter(
+            PlannedWorkout.workout_date >= week_ago.date(),
+            Athlete.is_active == True
+        ).order_by(
+            PlannedWorkout.workout_date.desc(),
+            PlannedWorkout.athlete_id
+        ).limit(20).all()
 
-        # Get upcoming workouts
+        # Get upcoming workouts without duplicates
         today = datetime.now().date()
-        upcoming_workouts = db.session.query(PlannedWorkout).filter(
-            PlannedWorkout.workout_date >= today).order_by(
-                PlannedWorkout.workout_date,
-                PlannedWorkout.athlete_id).distinct().limit(20).all()
+        upcoming_workouts = db.session.query(PlannedWorkout).join(Athlete).filter(
+            PlannedWorkout.workout_date >= today,
+            Athlete.is_active == True
+        ).order_by(
+            PlannedWorkout.workout_date,
+            PlannedWorkout.athlete_id
+        ).limit(20).all()
 
         return render_template('training_plan.html',
                                validation_results=validation_results,

@@ -470,6 +470,72 @@ class DailyTaskScheduler:
             logger.error(error_msg)
             return False
 
+    def sync_athlete_activities(self, athlete: 'Athlete', target_date: datetime) -> int:
+        """Sync activities for a specific athlete on a specific date"""
+        try:
+            if not athlete.refresh_token:
+                logger.warning(f"No refresh token for athlete {athlete.name}")
+                return 0
+
+            # Refresh access token
+            token_data = self.strava_client.refresh_access_token(athlete.refresh_token)
+            if not token_data:
+                logger.error(f"Failed to refresh token for athlete {athlete.name}")
+                return 0
+
+            # Update athlete token data
+            athlete.access_token = token_data['access_token']
+            athlete.token_expires_at = datetime.fromtimestamp(token_data['expires_at'])
+            if 'refresh_token' in token_data:
+                athlete.refresh_token = token_data['refresh_token']
+
+            # Commit token updates immediately
+            db.session.commit()
+
+            # Fetch activities for target date
+            start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_of_day = start_of_day + timedelta(days=1)
+
+            activities = self.strava_client.get_athlete_activities(
+                athlete.access_token, start_of_day, end_of_day
+            )
+
+            if not activities:
+                logger.info(f"No activities found for athlete {athlete.name} on {target_date.strftime('%Y-%m-%d')}")
+                return 0
+
+            # Process and save activities
+            saved_activities = 0
+            for activity_data in activities:
+                try:
+                    processed_activity = self.strava_client.process_activity_data(activity_data)
+                    if processed_activity:
+                        if self._save_activity(athlete.id, processed_activity):
+                            saved_activities += 1
+                except Exception as e:
+                    logger.error(f"Failed to process activity for athlete {athlete.name}: {e}")
+                    continue
+
+            logger.info(f"Processed {saved_activities} activities for athlete {athlete.name}")
+            return saved_activities
+
+        except Exception as e:
+            logger.error(f"Failed to sync activities for athlete {athlete.name}: {e}")
+            return 0
+
+    def process_daily_performance(self, athlete_id: int, target_date: datetime) -> bool:
+        """Process daily performance for a specific athlete and date"""
+        try:
+            performance_summary = self.data_processor.process_athlete_daily_performance(
+                athlete_id, target_date
+            )
+            if performance_summary:
+                return self.data_processor.save_daily_summary(performance_summary)
+            return False
+        except Exception as e:
+            logger.error(f"Failed to process daily performance for athlete {athlete_id}: {e}")
+            return False
+
     def health_check(self) -> dict:
         """Perform a health check of the scheduler system"""
         try:
@@ -536,3 +602,11 @@ def run_manual_task(target_date: Optional[datetime] = None) -> bool:
 def get_scheduler_health() -> dict:
     """Get scheduler health status"""
     return daily_scheduler.health_check()
+
+def sync_athlete_activities(athlete, target_date: datetime) -> int:
+    """Module-level function to sync athlete activities"""
+    return daily_scheduler.sync_athlete_activities(athlete, target_date)
+
+def process_daily_performance(athlete_id: int, target_date: datetime) -> bool:
+    """Module-level function to process daily performance"""
+    return daily_scheduler.process_daily_performance(athlete_id, target_date)

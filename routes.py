@@ -37,39 +37,40 @@ def index():
             Athlete.is_active == True
         ).scalar() or 0
 
-        # Total planned vs actual distance this week - only include active athletes
-        weekly_summaries = db.session.query(DailySummary).join(Athlete).filter(
-            DailySummary.summary_date >= week_ago.date(),
-            DailySummary.summary_date <= datetime.now().date(),
+        # Total planned vs actual distance this week - use consistent data source
+        # First, get planned workouts for the week
+        planned_workouts = db.session.query(PlannedWorkout).join(Athlete).filter(
+            PlannedWorkout.workout_date >= week_ago.date(),
+            PlannedWorkout.workout_date <= datetime.now().date(),
             Athlete.is_active == True
         ).all()
+        
+        # Remove duplicates by athlete_id and date
+        unique_planned = {}
+        for workout in planned_workouts:
+            key = f"{workout.athlete_id}_{workout.workout_date}"
+            if key not in unique_planned:
+                unique_planned[key] = workout
+        
+        weekly_planned = sum(w.planned_distance_km or 0 for w in unique_planned.values())
 
-        # Remove duplicates and calculate proper totals
-        unique_summaries = {}
-        for summary in weekly_summaries:
-            key = f"{summary.athlete_id}_{summary.summary_date}"
-            if key not in unique_summaries:
-                unique_summaries[key] = summary
-
-        weekly_planned = sum(s.planned_distance_km or 0 for s in unique_summaries.values())
-        weekly_actual = sum(s.actual_distance_km or 0 for s in unique_summaries.values())
-
-        # If no daily summaries, try to get planned workouts directly
-        if weekly_planned == 0:
-            planned_workouts = db.session.query(PlannedWorkout).join(Athlete).filter(
-                PlannedWorkout.workout_date >= week_ago.date(),
-                PlannedWorkout.workout_date <= datetime.now().date(),
-                Athlete.is_active == True
-            ).all()
-            
-            # Remove duplicates by athlete_id and date
-            unique_planned = {}
-            for workout in planned_workouts:
-                key = f"{workout.athlete_id}_{workout.workout_date}"
-                if key not in unique_planned:
-                    unique_planned[key] = workout
-            
-            weekly_planned = sum(w.planned_distance_km or 0 for w in unique_planned.values())
+        # Get actual activities for the week
+        actual_activities = db.session.query(Activity).join(Athlete).filter(
+            func.date(Activity.start_date) >= week_ago.date(),
+            func.date(Activity.start_date) <= datetime.now().date(),
+            Athlete.is_active == True
+        ).all()
+        
+        # Remove duplicates and sum actual distance
+        unique_activities = {}
+        for activity in actual_activities:
+            activity_date = activity.start_date.date()
+            key = f"{activity.athlete_id}_{activity_date}"
+            if key not in unique_activities:
+                unique_activities[key] = 0
+            unique_activities[key] += activity.distance_km or 0
+        
+        weekly_actual = sum(unique_activities.values())
 
         # Get all athletes for management
         all_athletes = db.session.query(Athlete).order_by(Athlete.name).all()
@@ -77,6 +78,9 @@ def index():
         # Get unified summary data with filtering support
         filter_period = request.args.get('period', 'week')  # day, week, month
         summary_data = get_filtered_summary_data(filter_period)
+
+        # Get leader dashboard data
+        leader_dashboard_data = get_leader_dashboard_data()
 
         return render_template('index.html',
                                total_athletes=total_athletes,
@@ -86,7 +90,8 @@ def index():
                                weekly_actual=weekly_actual,
                                all_athletes=all_athletes,
                                summary_data=summary_data,
-                               current_period=filter_period)
+                               current_period=filter_period,
+                               leader_dashboard=leader_dashboard_data)
 
     except Exception as e:
         logger.error(f"Error loading home page: {e}")
@@ -101,6 +106,94 @@ def index():
                                summary_data=[],
                                current_period='week')
 
+
+def get_leader_dashboard_data():
+    """Get leader dashboard data with athlete-wise consolidated actual runs and previous week data"""
+    try:
+        # Get all active athletes
+        athletes = db.session.query(Athlete).filter_by(is_active=True).all()
+        
+        # Calculate date ranges
+        today = datetime.now().date()
+        week_ago = today - timedelta(days=7)
+        start_tracking_date = datetime(2025, 5, 19).date()  # Base tracking date
+        
+        leader_data = []
+        
+        for athlete in athletes:
+            # Get total actual distance since start of tracking
+            total_activities = db.session.query(Activity).filter(
+                Activity.athlete_id == athlete.id,
+                func.date(Activity.start_date) >= start_tracking_date,
+                func.date(Activity.start_date) <= today
+            ).all()
+            
+            # Remove duplicates and calculate total
+            unique_activities = {}
+            for activity in total_activities:
+                activity_date = activity.start_date.date()
+                key = f"{activity.athlete_id}_{activity_date}"
+                if key not in unique_activities:
+                    unique_activities[key] = 0
+                unique_activities[key] += activity.distance_km or 0
+            
+            total_actual_km = sum(unique_activities.values())
+            
+            # Get previous week data
+            prev_week_activities = db.session.query(Activity).filter(
+                Activity.athlete_id == athlete.id,
+                func.date(Activity.start_date) >= week_ago,
+                func.date(Activity.start_date) < today
+            ).all()
+            
+            # Calculate previous week total
+            prev_week_unique = {}
+            for activity in prev_week_activities:
+                activity_date = activity.start_date.date()
+                key = f"{activity.athlete_id}_{activity_date}"
+                if key not in prev_week_unique:
+                    prev_week_unique[key] = 0
+                prev_week_unique[key] += activity.distance_km or 0
+            
+            prev_week_actual = sum(prev_week_unique.values())
+            
+            # Get previous week planned
+            prev_week_planned_workouts = db.session.query(PlannedWorkout).filter(
+                PlannedWorkout.athlete_id == athlete.id,
+                PlannedWorkout.workout_date >= week_ago,
+                PlannedWorkout.workout_date < today
+            ).all()
+            
+            prev_week_planned = sum(w.planned_distance_km or 0 for w in prev_week_planned_workouts)
+            
+            # Calculate completion rate for previous week
+            completion_rate = (prev_week_actual / prev_week_planned * 100) if prev_week_planned > 0 else 0
+            
+            # Get latest activity date
+            latest_activity = db.session.query(Activity).filter_by(athlete_id=athlete.id).order_by(Activity.start_date.desc()).first()
+            latest_activity_date = latest_activity.start_date.date() if latest_activity else None
+            
+            athlete_data = {
+                'athlete_id': athlete.id,
+                'athlete_name': athlete.name,
+                'total_actual_km': round(total_actual_km, 1),
+                'prev_week_actual': round(prev_week_actual, 1),
+                'prev_week_planned': round(prev_week_planned, 1),
+                'prev_week_completion_rate': round(completion_rate, 1),
+                'latest_activity_date': latest_activity_date.strftime('%Y-%m-%d') if latest_activity_date else 'No activities',
+                'status': 'On Track' if completion_rate >= 80 else 'Behind' if completion_rate < 50 else 'Fair'
+            }
+            
+            leader_data.append(athlete_data)
+        
+        # Sort by total actual distance (descending)
+        leader_data.sort(key=lambda x: x['total_actual_km'], reverse=True)
+        
+        return leader_data
+        
+    except Exception as e:
+        logger.error(f"Error getting leader dashboard data: {e}")
+        return []
 
 def get_filtered_summary_data(period='week'):
     """Get summary data filtered by period with aggregated planned vs actual"""
@@ -676,6 +769,16 @@ def sync_activities():
     except Exception as e:
         logger.error(f"Error loading sync activities page: {e}")
         flash(f"Error loading page: {e}", "error")
+        return redirect(url_for('index'))
+
+@app.route('/configuration')
+def configuration():
+    """Configuration page for system settings"""
+    try:
+        return render_template('configuration.html')
+    except Exception as e:
+        logger.error(f"Error loading configuration page: {e}")
+        flash(f"Error loading configuration: {e}", "error")
         return redirect(url_for('index'))
 
 @app.route('/training-plan')

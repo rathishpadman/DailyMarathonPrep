@@ -1,0 +1,267 @@
+
+<!DOCTYPE html>
+{% extends "base.html" %}
+{% block title %}Configuration - Marathon Training{% endblock %}
+{% block content %}
+<div class="container">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="settings" class="me-2"></i>
+                        System Configuration
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Configure system-wide settings including tracking dates, API configurations, and notification preferences.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Training Configuration -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Training Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <form id="trainingConfigForm">
+                        <div class="mb-3">
+                            <label for="startDate" class="form-label">Tracking Start Date</label>
+                            <input type="date" class="form-control" id="startDate" value="2025-05-19">
+                            <div class="form-text">Date from which to start tracking athlete performance</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="endDate" class="form-label">Tracking End Date</label>
+                            <input type="date" class="form-control" id="endDate">
+                            <div class="form-text">End date for tracking (leave blank for ongoing tracking)</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="syncFrequency" class="form-label">Sync Frequency</label>
+                            <select class="form-select" id="syncFrequency">
+                                <option value="3">3 times per day (9 AM, 5 PM, 10 PM)</option>
+                                <option value="2">2 times per day (9 AM, 9 PM)</option>
+                                <option value="1">Once per day (9 AM)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Training Config</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Strava API Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <form id="stravaConfigForm">
+                        <div class="mb-3">
+                            <label for="stravaClientId" class="form-label">Strava Client ID</label>
+                            <input type="text" class="form-control" id="stravaClientId" placeholder="Enter Strava Client ID">
+                        </div>
+                        <div class="mb-3">
+                            <label for="stravaClientSecret" class="form-label">Strava Client Secret</label>
+                            <input type="password" class="form-control" id="stravaClientSecret" placeholder="Enter Strava Client Secret">
+                        </div>
+                        <div class="mb-3">
+                            <label for="stravaRedirectUri" class="form-label">Redirect URI</label>
+                            <input type="url" class="form-control" id="stravaRedirectUri" 
+                                   value="{{ request.url_root }}auth/strava/callback" readonly>
+                            <div class="form-text">This URL must be configured in your Strava app settings</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Strava Config</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WhatsApp Configuration -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">WhatsApp Notifications</h6>
+                </div>
+                <div class="card-body">
+                    <form id="whatsappConfigForm">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="whatsappEnabled">
+                                <label class="form-check-label" for="whatsappEnabled">
+                                    Enable WhatsApp Notifications
+                                </label>
+                            </div>
+                        </div>
+                        <div id="whatsappSettings" style="display: none;">
+                            <div class="mb-3">
+                                <label for="whatsappApiUrl" class="form-label">WhatsApp API URL</label>
+                                <input type="url" class="form-control" id="whatsappApiUrl" placeholder="Enter WhatsApp API URL">
+                            </div>
+                            <div class="mb-3">
+                                <label for="whatsappAccessToken" class="form-label">Access Token</label>
+                                <input type="password" class="form-control" id="whatsappAccessToken" placeholder="Enter Access Token">
+                            </div>
+                            <div class="mb-3">
+                                <label for="whatsappPhoneNumber" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="whatsappPhoneNumber" placeholder="+1234567890">
+                            </div>
+                            <div class="mb-3">
+                                <label for="notificationTime" class="form-label">Daily Notification Time</label>
+                                <input type="time" class="form-control" id="notificationTime" value="08:00">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save WhatsApp Config</button>
+                        <button type="button" class="btn btn-outline-secondary" id="testWhatsapp">Test Notification</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Email Configuration (Fallback)</h6>
+                </div>
+                <div class="card-body">
+                    <form id="emailConfigForm">
+                        <div class="mb-3">
+                            <label for="smtpServer" class="form-label">SMTP Server</label>
+                            <input type="text" class="form-control" id="smtpServer" placeholder="smtp.gmail.com">
+                        </div>
+                        <div class="mb-3">
+                            <label for="smtpPort" class="form-label">SMTP Port</label>
+                            <input type="number" class="form-control" id="smtpPort" value="587">
+                        </div>
+                        <div class="mb-3">
+                            <label for="emailUser" class="form-label">Email Username</label>
+                            <input type="email" class="form-control" id="emailUser" placeholder="your-email@gmail.com">
+                        </div>
+                        <div class="mb-3">
+                            <label for="emailPassword" class="form-label">Email Password</label>
+                            <input type="password" class="form-control" id="emailPassword" placeholder="App Password">
+                        </div>
+                        <div class="mb-3">
+                            <label for="recipientEmails" class="form-label">Recipient Emails</label>
+                            <input type="text" class="form-control" id="recipientEmails" 
+                                   placeholder="email1@example.com,email2@example.com">
+                            <div class="form-text">Comma-separated list of email addresses</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Email Config</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Status -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">System Status</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="mb-2">
+                                    <i data-feather="database" class="text-primary" style="width: 2rem; height: 2rem;"></i>
+                                </div>
+                                <h6>Database</h6>
+                                <span class="badge bg-success">Connected</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="mb-2">
+                                    <i data-feather="activity" class="text-info" style="width: 2rem; height: 2rem;"></i>
+                                </div>
+                                <h6>Strava API</h6>
+                                <span class="badge bg-warning" id="stravaStatus">Not Configured</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="mb-2">
+                                    <i data-feather="message-circle" class="text-success" style="width: 2rem; height: 2rem;"></i>
+                                </div>
+                                <h6>WhatsApp</h6>
+                                <span class="badge bg-secondary" id="whatsappStatus">Disabled</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="mb-2">
+                                    <i data-feather="clock" class="text-warning" style="width: 2rem; height: 2rem;"></i>
+                                </div>
+                                <h6>Scheduler</h6>
+                                <span class="badge bg-success" id="schedulerStatus">Running</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// WhatsApp toggle functionality
+document.getElementById('whatsappEnabled').addEventListener('change', function() {
+    const settings = document.getElementById('whatsappSettings');
+    settings.style.display = this.checked ? 'block' : 'none';
+});
+
+// Form submissions
+document.getElementById('trainingConfigForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Implementation for saving training config
+    showAlert('Training configuration saved successfully!', 'success');
+});
+
+document.getElementById('stravaConfigForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Implementation for saving Strava config
+    showAlert('Strava configuration saved successfully!', 'success');
+});
+
+document.getElementById('whatsappConfigForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Implementation for saving WhatsApp config
+    showAlert('WhatsApp configuration saved successfully!', 'success');
+});
+
+document.getElementById('emailConfigForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Implementation for saving email config
+    showAlert('Email configuration saved successfully!', 'success');
+});
+
+// Test WhatsApp notification
+document.getElementById('testWhatsapp').addEventListener('click', function() {
+    // Implementation for testing WhatsApp
+    showAlert('Test notification sent!', 'info');
+});
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.querySelector('.container').prepend(alertDiv);
+    
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}

@@ -114,19 +114,22 @@ def index():
 def get_last_strava_sync_time():
     """Get the last Strava sync time in IST"""
     try:
-        from models import StravaApiUsage
-        import pytz
+        # Check if table exists by using SystemLog instead
+        latest_log = db.session.query(SystemLog).filter(
+            SystemLog.log_type.in_(['SYNC_SUCCESS', 'ACTIVITY_SYNC'])
+        ).order_by(SystemLog.created_at.desc()).first()
 
-        latest_usage = db.session.query(StravaApiUsage).order_by(
-            StravaApiUsage.last_sync_time.desc()
-        ).first()
-
-        if latest_usage and latest_usage.last_sync_time:
+        if latest_log and latest_log.created_at:
             # Convert to IST
-            ist = pytz.timezone('Asia/Kolkata')
-            utc_time = latest_usage.last_sync_time.replace(tzinfo=pytz.UTC)
-            ist_time = utc_time.astimezone(ist)
-            return ist_time.strftime('%Y-%m-%d %H:%M:%S IST')
+            try:
+                import pytz
+                ist = pytz.timezone('Asia/Kolkata')
+                utc_time = latest_log.created_at.replace(tzinfo=pytz.UTC)
+                ist_time = utc_time.astimezone(ist)
+                return ist_time.strftime('%Y-%m-%d %H:%M:%S IST')
+            except ImportError:
+                # Fallback without timezone conversion
+                return latest_log.created_at.strftime('%Y-%m-%d %H:%M:%S UTC')
 
         return "Never"
     except Exception as e:

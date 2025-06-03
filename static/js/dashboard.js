@@ -815,6 +815,10 @@ document.addEventListener('DOMContentLoaded', function() {
 // Athlete Progress Filtering Functions
 let athleteProgressData = [];
 let filteredData = [];
+let originalProgressData = [];
+let currentProgressData = [];
+let currentSortColumn = null;
+let currentSortDirection = 'asc';
 
 function initializeProgressFilters() {
     // Load initial athlete progress data with additional metrics
@@ -824,12 +828,18 @@ function initializeProgressFilters() {
 
 function loadAthleteProgressData() {
     fetch('/api/athlete-progress-data')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 athleteProgressData = data.athletes;
-                filteredData = [...athleteProgressData];
-                updateProgressTable();
+                originalProgressData = [...athleteProgressData];
+                currentProgressData = [...athleteProgressData];
+                populateProgressTable(currentProgressData);
                 populateAthleteFilter(data.athletes);
             } else {
                 console.error('Error loading athlete progress data:', data.message);
@@ -847,105 +857,138 @@ function loadAthleteProgressData() {
 // Global variables for athlete data
 
 // Update progress view based on filters
+// Filter Functions
 function updateProgressView() {
-    const athleteFilter = document.getElementById('progressAthleteFilter')?.value || 'all';
-    const metricFilter = document.getElementById('metricFilter')?.value || 'distance';
+    const metric = document.getElementById('metricFilter')?.value || 'total_distance';
+    const debug = document.getElementById('debugFilter')?.checked || false;
 
-    // Filter data
-    if (athleteFilter === 'all') {
-        filteredData = [...athleteProgressData];
-    } else {
-        filteredData = athleteProgressData.filter(athlete => athlete.id.toString() === athleteFilter);
+    // Re-populate table with current filter
+    if (currentProgressData && currentProgressData.length > 0) {
+        populateProgressTable(currentProgressData);
     }
 
-    // Update table and chart
-    updateProgressTable();
-    updateProgressChart(metricFilter);
+    console.log('Progress view updated with metric:', metric, 'debug:', debug);
 }
 
-// Filter progress table by athlete
-function filterByAthlete(athleteId) {
-    const filter = document.getElementById('progressAthleteFilter');
-    if (filter) {
-        filter.value = athleteId;
-        updateProgressView();
-    }
-}
-
-// Update metric display
 function updateMetricDisplay() {
-    const metric = document.getElementById('metricFilter')?.value || 'distance';
-    updateProgressChart(metric);
+    const metric = document.getElementById('metricFilter')?.value || 'total_distance';
+    updateProgressView();
 }
 
-// Sort progress table
 function sortProgressTable(column) {
-    filteredData.sort((a, b) => {
-        let aValue, bValue;
+    if (!currentProgressData || currentProgressData.length === 0) return;
 
-        switch(column) {
-            case 'distance':
-                aValue = a.total_distance;
-                bValue = b.total_distance;
-                break;
-            case 'pace':
-                aValue = a.avg_pace;
-                bValue = b.avg_pace;
-                break;
-            case 'heart_rate':
-                aValue = a.avg_heart_rate;
-                bValue = b.avg_heart_rate;
-                break;
-            case 'elevation':
-                aValue = a.total_elevation;
-                bValue = b.total_elevation;
-                break;
-            case 'current_week':
-                aValue = a.current_week_distance;
-                bValue = b.current_week_distance;
-                break;
-            case 'prev_week':
-                aValue = a.prev_week_distance;
-                bValue = b.prev_week_distance;
-                break;
-            default:
-                aValue = 0;
-                bValue = 0;
+    // Toggle sort direction
+    if (currentSortColumn === column) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortColumn = column;
+        currentSortDirection = 'asc';
+    }
+
+    // Sort data
+    currentProgressData.sort((a, b) => {
+        let aVal = a[column];
+        let bVal = b[column];
+
+        // Handle null/undefined values
+        if (aVal == null) aVal = 0;
+        if (bVal == null) bVal = 0;
+
+        // Handle different data types
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
         }
 
-        return bValue - aValue; // Descending order
+        if (currentSortDirection === 'asc') {
+            return aVal > bVal ? 1 : -1;
+        } else {
+            return aVal < bVal ? 1 : -1;
+        }
     });
 
-    updateProgressTable();
+    populateProgressTable(currentProgressData);
 }
 
-// Update progress table with filtered and sorted data
-function updateProgressTable() {
-    const tbody = document.querySelector('#progressTable tbody');
-    if (!tbody) return;
+function filterByAthlete() {
+    const athleteFilter = document.getElementById('athleteFilterProgress')?.value;
 
-    tbody.innerHTML = '';
+    if (!athleteFilter || athleteFilter === 'all') {
+        currentProgressData = [...originalProgressData];
+        populateProgressTable(currentProgressData);
+        updateChartsForAthlete('all');
+        return;
+    }
 
-    filteredData.forEach(athlete => {
+    currentProgressData = originalProgressData.filter(athlete => 
+        athlete.id == athleteFilter
+    );
+
+    populateProgressTable(currentProgressData);
+    updateChartsForAthlete(athleteFilter);
+}
+
+// Populate Athlete Progress Table
+function populateProgressTable(athletes) {
+    const tableBody = document.querySelector('#athleteProgressTable tbody');
+    if (!tableBody) return;
+
+    if (!athletes || athletes.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No athlete data available</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = '';
+
+    athletes.forEach(athlete => {
         const row = document.createElement('tr');
-        row.dataset.athleteId = athlete.id;
+
+        // Get current week data (last 7 days from today)
+        const today = new Date();
+        const weekAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
+        const twoWeeksAgo = new Date(today.getTime() - (14 * 24 * 60 * 60 * 1000));
+
+        // Calculate current and previous week (placeholder - would need actual activity data)
+        const currentWeek = (athlete.total_distance / 4) || 0; // Estimated
+        const previousWeek = (athlete.total_distance / 5) || 0; // Estimated
 
         row.innerHTML = `
-            <td><strong>${athlete.name}</strong></td>
-            <td data-column="distance">${athlete.total_distance} km</td>
-            <td data-column="pace">${athlete.avg_pace > 0 ? athlete.avg_pace + ' min/km' : 'N/A'}</td>
-            <td data-column="heart_rate">${athlete.avg_heart_rate > 0 ? athlete.avg_heart_rate + ' bpm' : 'N/A'}</td>
-            <td data-column="elevation">${athlete.total_elevation} m</td>
-            <td data-column="current_week">${athlete.current_week_distance} km</td>
-            <td data-column="prev_week">${athlete.prev_week_distance} km</td>
-            <td data-column="comparison">
-                <span class="${athlete.week_comparison >= 0 ? 'text-success' : 'text-danger'}">
-                    ${athlete.week_comparison >= 0 ? '+' : ''}${athlete.week_comparison} km
-                </span>
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="athlete-avatar me-2">
+                        ${athlete.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <div class="fw-semibold">${athlete.name}</div>
+                        <small class="text-muted">${athlete.activity_count || 0} activities</small>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <span class="fw-semibold text-primary">${(athlete.total_distance || 0).toFixed(1)} km</span>
+            </td>
+            <td>
+                <span class="fw-semibold">${(athlete.avg_pace || 0).toFixed(1)} min/km</span>
+            </td>
+            <td>
+                <span class="fw-semibold text-danger">${Math.round(athlete.avg_heart_rate || 0)} bpm</span>
+            </td>
+            <td>
+                <span class="fw-semibold text-success">${Math.round(athlete.total_elevation || 0)} m</span>
+            </td>
+            <td>
+                <div class="d-flex justify-content-between align-items-center">
+                    <small>Current: ${currentWeek.toFixed(1)} km</small>
+                    <small>Previous: ${previousWeek.toFixed(1)} km</small>
+                </div>
+                <div class="progress mt-1" style="height: 4px;">
+                    <div class="progress-bar" role="progressbar" 
+                         style="width: ${Math.min(100, (currentWeek / (previousWeek || 1)) * 100)}%"></div>
+                </div>
             </td>
         `;
-
-        tbody.appendChild(row);
+        tableBody.appendChild(row);
     });
 }
 

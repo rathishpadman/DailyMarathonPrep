@@ -258,7 +258,18 @@
                                 {% for day_data in summary_data %}
                                 <tr>
                                     <td>{{ day_data.period_label if day_data.period_label else day_data.date.strftime('%Y-%m-%d') }}</td>
-                                    <td>{{ day_data.athletes|length }}</td>
+                                    <td>
+                                            {% if day_data.athletes %}
+                                                {% for athlete in day_data.athletes[:3] %}
+                                                    <span class="badge bg-light text-dark me-1">{{ athlete.name }}</span>
+                                                {% endfor %}
+                                                {% if day_data.athletes|length > 3 %}
+                                                    <span class="badge bg-secondary">+{{ day_data.athletes|length - 3 }} more</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">No athletes</span>
+                                            {% endif %}
+                                        </td>
                                     <td>{{ "%.1f"|format(day_data.total_planned) }}</td>
                                     <td>{{ "%.1f"|format(day_data.total_actual) }}</td>
                                     <td>{{ "%.1f"|format(day_data.completion_rate) }}%</td>

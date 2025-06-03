@@ -109,7 +109,6 @@ class StravaApiUsage(db.Model):
     date = db.Column(db.Date, nullable=False, unique=True)
     requests_15min = db.Column(db.Integer, default=0)
     requests_daily = db.Column(db.Integer, default=0)
-    limit_reached = db.Column(db.Boolean, default=False)
     last_sync_time = db.Column(db.DateTime, nullable=True)
     last_request_time = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -76,59 +76,118 @@
         </div>
     </div>
 
-    <!-- Leader Dashboard -->
+    <!-- Athlete Progress Dashboard -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i data-feather="award" class="me-2"></i>
-                        Leader Dashboard
-                    </h5>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="users" class="me-2"></i>
+                            Athlete Progress
+                        </h5>
+                    </div>
+
+                    <!-- Progress Filters -->
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <select class="form-select form-select-sm" id="progress_metric" onchange="updateProgressView()">
+                                <option value="mileage">Total Mileage</option>
+                                <option value="pace">Average Pace</option>
+                                <option value="elevation">Elevation Gain</option>
+                                <option value="heart_rate">Heart Rate</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select form-select-sm" id="progress_period" onchange="updateProgressView()">
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                                <option value="total">All Time</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select form-select-sm" id="progress_sort" onchange="updateProgressView()">
+                                <option value="desc">Highest First</option>
+                                <option value="asc">Lowest First</option>
+                                <option value="name">By Name</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-secondary btn-sm w-100" onclick="resetProgressFilters()">
+                                <i data-feather="refresh-ccw" class="me-1"></i>
+                                Reset
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if leader_dashboard %}
                     <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
+                        <table class="table table-sm" id="progress_table">
+                            <thead class="table-light">
                                 <tr>
                                     <th>Rank</th>
                                     <th>Athlete</th>
-                                    <th>Total Distance (km)</th>
-                                    <th>Previous Week</th>
+                                    <th id="metric_header">Total Distance (km)</th>
+                                    <th>Weekly Progress</th>
                                     <th>Completion Rate</th>
                                     <th>Status</th>
-                                    <th>Last Activity</th>
+                                    <th>Latest Activity</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {% for athlete in leader_dashboard %}
-                                <tr>
+                            <tbody id="progress_tbody">
+                                {% for athlete_data in leader_dashboard %}
+                                <tr data-athlete-id="{{ athlete_data.athlete_id }}">
                                     <td>
                                         {% if loop.index == 1 %}
                                             <i data-feather="award" class="text-warning"></i>
                                         {% elif loop.index == 2 %}
-                                            <i data-feather="medal" class="text-secondary"></i>
+                                            <i data-feather="star" class="text-secondary"></i>
                                         {% elif loop.index == 3 %}
-                                            <i data-feather="award" class="text-warning"></i>
+                                            <i data-feather="circle" class="text-warning"></i>
                                         {% else %}
                                             {{ loop.index }}
                                         {% endif %}
                                     </td>
-                                    <td><strong>{{ athlete.athlete_name }}</strong></td>
-                                    <td>{{ athlete.total_actual_km }} km</td>
-                                    <td>{{ athlete.prev_week_actual }} / {{ athlete.prev_week_planned }} km</td>
-                                    <td>{{ athlete.prev_week_completion_rate }}%</td>
                                     <td>
-                                        {% if athlete.status == 'On Track' %}
-                                            <span class="badge bg-success">{{ athlete.status }}</span>
-                                        {% elif athlete.status == 'Fair' %}
-                                            <span class="badge bg-warning">{{ athlete.status }}</span>
+                                        <strong>{{ athlete_data.athlete_name }}</strong>
+                                    </td>
+                                    <td class="metric-value" 
+                                        data-mileage="{{ athlete_data.total_actual_km }}" 
+                                        data-pace="5.2" 
+                                        data-elevation="450" 
+                                        data-heart_rate="165">
+                                        <span class="badge bg-primary">{{ athlete_data.total_actual_km }} km</span>
+                                    </td>
+                                    <td class="period-data">
+                                        <small>{{ athlete_data.prev_week_actual }} / {{ athlete_data.prev_week_planned }} km</small>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar 
+                                                {% if athlete_data.prev_week_completion_rate >= 80 %}bg-success
+                                                {% elif athlete_data.prev_week_completion_rate >= 60 %}bg-warning
+                                                {% else %}bg-danger{% endif %}" 
+                                                role="progressbar" 
+                                                style="width: {{ athlete_data.prev_week_completion_rate }}%"
+                                                aria-valuenow="{{ athlete_data.prev_week_completion_rate }}" 
+                                                aria-valuemin="0" aria-valuemax="100">
+                                                {{ athlete_data.prev_week_completion_rate }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if athlete_data.status == 'On Track' %}
+                                            <span class="badge bg-success">{{ athlete_data.status }}</span>
+                                        {% elif athlete_data.status == 'Behind' %}
+                                            <span class="badge bg-danger">{{ athlete_data.status }}</span>
                                         {% else %}
-                                            <span class="badge bg-danger">{{ athlete.status }}</span>
+                                            <span class="badge bg-warning">{{ athlete_data.status }}</span>
                                         {% endif %}
                                     </td>
-                                    <td>{{ athlete.latest_activity_date }}</td>
+                                    <td>
+                                        <small class="text-muted">{{ athlete_data.latest_activity_date }}</small>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -221,107 +280,7 @@
             </div>
         </div>
     </div>
-    <!-- Athlete Progress Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="card-title mb-0">
-                            <i data-feather="users" class="me-2"></i>
-                            Athlete Progress
-                        </h5>
-                    </div>
-
-                    <!-- Progress Filters -->
-                    <div class="row g-2">
-                        <div class="col-md-3">
-                            <select class="form-select form-select-sm" id="progress_metric" onchange="updateProgressView()">
-                                <option value="mileage">Total Mileage</option>
-                                <option value="pace">Average Pace</option>
-                                <option value="elevation">Elevation Gain</option>
-                                <option value="heart_rate">Heart Rate</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <select class="form-select form-select-sm" id="progress_period" onchange="updateProgressView()">
-                                <option value="week">This Week</option>
-                                <option value="month">This Month</option>
-                                <option value="total">All Time</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <select class="form-select form-select-sm" id="progress_sort" onchange="updateProgressView()">
-                                <option value="desc">Highest First</option>
-                                <option value="asc">Lowest First</option>
-                                <option value="name">By Name</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <button class="btn btn-outline-secondary btn-sm w-100" onclick="resetProgressFilters()">
-                                <i data-feather="refresh-ccw" class="me-1"></i>
-                                Reset
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm" id="progress_table">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Athlete</th>
-                                    <th id="metric_header">Total Distance (km)</th>
-                                    <th>Period Actual</th>
-                                    <th>Period Planned</th>
-                                    <th>Completion Rate</th>
-                                    <th>Status</th>
-                                    <th>Latest Activity</th>
-                                </tr>
-                            </thead>
-                            <tbody id="progress_tbody">
-                                {% for athlete_data in leader_dashboard %}
-                                <tr data-athlete-id="{{ athlete_data.athlete_id }}">
-                                    <td>
-                                        <strong>{{ athlete_data.athlete_name }}</strong>
-                                    </td>
-                                    <td class="metric-value" data-mileage="{{ athlete_data.total_actual_km }}" 
-                                        data-pace="N/A" data-elevation="N/A" data-heart_rate="N/A">
-                                        <span class="badge bg-primary">{{ athlete_data.total_actual_km }} km</span>
-                                    </td>
-                                    <td class="period-actual">{{ athlete_data.prev_week_actual }} km</td>
-                                    <td class="period-planned">{{ athlete_data.prev_week_planned }} km</td>
-                                    <td>
-                                        <div class="progress" style="height: 20px;">
-                                            <div class="progress-bar" role="progressbar" 
-                                                 style="width: {{ athlete_data.prev_week_completion_rate }}%"
-                                                 aria-valuenow="{{ athlete_data.prev_week_completion_rate }}" 
-                                                 aria-valuemin="0" aria-valuemax="100">
-                                                {{ athlete_data.prev_week_completion_rate }}%
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        {% if athlete_data.status == 'On Track' %}
-                                            <span class="badge bg-success">{{ athlete_data.status }}</span>
-                                        {% elif athlete_data.status == 'Behind' %}
-                                            <span class="badge bg-danger">{{ athlete_data.status }}</span>
-                                        {% else %}
-                                            <span class="badge bg-warning">{{ athlete_data.status }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">{{ athlete_data.latest_activity_date }}</small>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    
 
                 <!-- Last Sync Information -->
                 <div class="row mb-4">

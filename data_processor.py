@@ -420,17 +420,25 @@ class DataProcessor:
         try:
             from models import StravaApiUsage
             from app import db
+            from datetime import datetime
+            import pytz
             
-            today = datetime.now().date()
+            # Use IST timezone for consistency
+            ist = pytz.timezone('Asia/Kolkata')
+            now_ist = datetime.now(ist)
+            today = now_ist.date()
+            
             usage = db.session.query(StravaApiUsage).filter_by(date=today).first()
             
             if not usage:
                 usage = StravaApiUsage(date=today)
                 db.session.add(usage)
             
-            usage.last_sync_time = datetime.now()
-            usage.updated_at = datetime.now()
+            usage.last_sync_time = now_ist.replace(tzinfo=None)  # Store as naive datetime
+            usage.updated_at = now_ist.replace(tzinfo=None)
             db.session.commit()
+            
+            logger.info(f"Updated last sync time to {now_ist.strftime('%Y-%m-%d %H:%M:%S IST')}")
             
         except Exception as e:
             logger.error(f"Error updating last sync time: {e}")

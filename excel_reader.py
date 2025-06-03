@@ -51,24 +51,46 @@ class ExcelReader:
             # Enhanced date parsing to handle multiple formats
             original_dates = df['Date'].copy()
             
-            # Try multiple date formats
-            df['Date'] = pd.to_datetime(df['Date'], errors='coerce', dayfirst=True)
+            # First attempt with flexible parsing
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce', infer_datetime_format=True)
             
-            # If still NaT, try other formats
+            # If still NaT, try specific formats
             if df['Date'].isna().any():
                 mask = df['Date'].isna()
-                # Try DD/MM/YYYY format
-                df.loc[mask, 'Date'] = pd.to_datetime(original_dates[mask], format='%d/%m/%Y', errors='coerce')
-            
-            if df['Date'].isna().any():
-                mask = df['Date'].isna()
-                # Try MM/DD/YYYY format
-                df.loc[mask, 'Date'] = pd.to_datetime(original_dates[mask], format='%m/%d/%Y', errors='coerce')
+                # Try DD/MM/YYYY format (European style)
+                try:
+                    df.loc[mask, 'Date'] = pd.to_datetime(original_dates[mask], format='%d/%m/%Y', errors='coerce')
+                except:
+                    pass
             
             if df['Date'].isna().any():
                 mask = df['Date'].isna()
-                # Try YYYY-MM-DD format
-                df.loc[mask, 'Date'] = pd.to_datetime(original_dates[mask], format='%Y-%m-%d', errors='coerce')
+                # Try MM/DD/YYYY format (US style)
+                try:
+                    df.loc[mask, 'Date'] = pd.to_datetime(original_dates[mask], format='%m/%d/%Y', errors='coerce')
+                except:
+                    pass
+            
+            if df['Date'].isna().any():
+                mask = df['Date'].isna()
+                # Try YYYY-MM-DD format (ISO style)
+                try:
+                    df.loc[mask, 'Date'] = pd.to_datetime(original_dates[mask], format='%Y-%m-%d', errors='coerce')
+                except:
+                    pass
+                    
+            if df['Date'].isna().any():
+                mask = df['Date'].isna()
+                # Try DD-MM-YYYY format
+                try:
+                    df.loc[mask, 'Date'] = pd.to_datetime(original_dates[mask], format='%d-%m-%Y', errors='coerce')
+                except:
+                    pass
+            
+            # Log problematic dates for debugging
+            problematic_dates = df[df['Date'].isna()]['Date'].head()
+            if not problematic_dates.empty:
+                logger.warning(f"Could not parse these dates: {problematic_dates.tolist()}")
             
             # Remove rows with unparseable dates
             valid_dates_mask = df['Date'].notna()
@@ -79,7 +101,7 @@ class ExcelReader:
                 return None
             
             logger.info(f"Date range in training plan: {df['Date'].min()} to {df['Date'].max()}")
-            logger.info(f"Successfully parsed {len(df)} rows with valid dates")
+            logger.info(f"Successfully parsed {len(df)} rows with valid dates out of {len(original_dates)} total rows")
 
             if df['Date'].isna().any():
                 logger.warning(
@@ -368,9 +390,35 @@ class ExcelReader:
 
             for index, row in df.iterrows():
                 try:
-                    # Parse date
+                    # Parse date with multiple format attempts
                     date_col = column_mapping['Date']
-                    workout_date = pd.to_datetime(row[date_col], dayfirst=True).date()
+                    date_value = row[date_col]
+                    
+                    # Try multiple date parsing approaches
+                    workout_date = None
+                    date_formats = [
+                        '%d/%m/%Y',  # DD/MM/YYYY
+                        '%m/%d/%Y',  # MM/DD/YYYY  
+                        '%Y-%m-%d',  # YYYY-MM-DD
+                        '%d-%m-%Y',  # DD-MM-YYYY
+                        '%Y/%m/%d',  # YYYY/MM/DD
+                    ]
+                    
+                    # First try pandas automatic parsing
+                    try:
+                        workout_date = pd.to_datetime(date_value, infer_datetime_format=True).date()
+                    except:
+                        # Try specific formats
+                        for fmt in date_formats:
+                            try:
+                                workout_date = pd.to_datetime(date_value, format=fmt).date()
+                                break
+                            except:
+                                continue
+                    
+                    if workout_date is None:
+                        logger.warning(f"Could not parse date '{date_value}' in row {index}")
+                        continue
 
                     # Get athlete name
                     athlete_col = column_mapping['AthleteName']

@@ -44,14 +44,14 @@ def index():
             PlannedWorkout.workout_date <= datetime.now().date(),
             Athlete.is_active == True
         ).all()
-        
+
         # Remove duplicates by athlete_id and date
         unique_planned = {}
         for workout in planned_workouts:
             key = f"{workout.athlete_id}_{workout.workout_date}"
             if key not in unique_planned:
                 unique_planned[key] = workout
-        
+
         weekly_planned = sum(w.planned_distance_km or 0 for w in unique_planned.values())
 
         # Get actual activities for the week
@@ -60,7 +60,7 @@ def index():
             func.date(Activity.start_date) <= datetime.now().date(),
             Athlete.is_active == True
         ).all()
-        
+
         # Remove duplicates and sum actual distance
         unique_activities = {}
         for activity in actual_activities:
@@ -69,7 +69,7 @@ def index():
             if key not in unique_activities:
                 unique_activities[key] = 0
             unique_activities[key] += activity.distance_km or 0
-        
+
         weekly_actual = sum(unique_activities.values())
 
         # Get all athletes for management
@@ -116,18 +116,18 @@ def get_last_strava_sync_time():
     try:
         from models import StravaApiUsage
         import pytz
-        
+
         latest_usage = db.session.query(StravaApiUsage).order_by(
             StravaApiUsage.last_sync_time.desc()
         ).first()
-        
+
         if latest_usage and latest_usage.last_sync_time:
             # Convert to IST
             ist = pytz.timezone('Asia/Kolkata')
             utc_time = latest_usage.last_sync_time.replace(tzinfo=pytz.UTC)
             ist_time = utc_time.astimezone(ist)
             return ist_time.strftime('%Y-%m-%d %H:%M:%S IST')
-        
+
         return "Never"
     except Exception as e:
         logger.error(f"Error getting last sync time: {e}")
@@ -138,14 +138,14 @@ def get_leader_dashboard_data():
     try:
         # Get all active athletes
         athletes = db.session.query(Athlete).filter_by(is_active=True).all()
-        
+
         # Calculate date ranges
         today = datetime.now().date()
         week_ago = today - timedelta(days=7)
         start_tracking_date = datetime(2025, 5, 19).date()  # Base tracking date
-        
+
         leader_data = []
-        
+
         for athlete in athletes:
             # Get total actual distance since start of tracking
             total_activities = db.session.query(Activity).filter(
@@ -153,7 +153,7 @@ def get_leader_dashboard_data():
                 func.date(Activity.start_date) >= start_tracking_date,
                 func.date(Activity.start_date) <= today
             ).all()
-            
+
             # Remove duplicates and calculate total
             unique_activities = {}
             for activity in total_activities:
@@ -162,16 +162,16 @@ def get_leader_dashboard_data():
                 if key not in unique_activities:
                     unique_activities[key] = 0
                 unique_activities[key] += activity.distance_km or 0
-            
+
             total_actual_km = sum(unique_activities.values())
-            
+
             # Get previous week data
             prev_week_activities = db.session.query(Activity).filter(
                 Activity.athlete_id == athlete.id,
                 func.date(Activity.start_date) >= week_ago,
                 func.date(Activity.start_date) < today
             ).all()
-            
+
             # Calculate previous week total
             prev_week_unique = {}
             for activity in prev_week_activities:
@@ -180,25 +180,25 @@ def get_leader_dashboard_data():
                 if key not in prev_week_unique:
                     prev_week_unique[key] = 0
                 prev_week_unique[key] += activity.distance_km or 0
-            
+
             prev_week_actual = sum(prev_week_unique.values())
-            
+
             # Get previous week planned
             prev_week_planned_workouts = db.session.query(PlannedWorkout).filter(
                 PlannedWorkout.athlete_id == athlete.id,
                 PlannedWorkout.workout_date >= week_ago,
                 PlannedWorkout.workout_date < today
             ).all()
-            
+
             prev_week_planned = sum(w.planned_distance_km or 0 for w in prev_week_planned_workouts)
-            
+
             # Calculate completion rate for previous week
             completion_rate = (prev_week_actual / prev_week_planned * 100) if prev_week_planned > 0 else 0
-            
+
             # Get latest activity date
             latest_activity = db.session.query(Activity).filter_by(athlete_id=athlete.id).order_by(Activity.start_date.desc()).first()
             latest_activity_date = latest_activity.start_date.date() if latest_activity else None
-            
+
             athlete_data = {
                 'athlete_id': athlete.id,
                 'athlete_name': athlete.name,
@@ -209,14 +209,14 @@ def get_leader_dashboard_data():
                 'latest_activity_date': latest_activity_date.strftime('%Y-%m-%d') if latest_activity_date else 'No activities',
                 'status': 'On Track' if completion_rate >= 80 else 'Behind' if completion_rate < 50 else 'Fair'
             }
-            
+
             leader_data.append(athlete_data)
-        
+
         # Sort by total actual distance (descending)
         leader_data.sort(key=lambda x: x['total_actual_km'], reverse=True)
-        
+
         return leader_data
-        
+
     except Exception as e:
         logger.error(f"Error getting leader dashboard data: {e}")
         return []
@@ -226,32 +226,32 @@ def get_filtered_summary_data(period='week'):
     try:
         end_date = datetime.now()
         start_date = datetime(2025, 5, 19)  # Base date for data
-        
+
         if period == 'day':
             # Get date range for last 10 days, but ensure we include planned data from May 23rd
             date_range_start = max(start_date.date(), (end_date - timedelta(days=30)).date())
-            
+
             # Get all planned workouts and daily summaries for the date range
             planned_workouts = db.session.query(PlannedWorkout).join(Athlete).filter(
                 PlannedWorkout.workout_date >= date_range_start,
                 PlannedWorkout.workout_date <= end_date.date(),
                 Athlete.is_active == True
             ).all()
-            
+
             summaries = db.session.query(DailySummary).join(Athlete).filter(
                 DailySummary.summary_date >= date_range_start,
                 DailySummary.summary_date <= end_date.date(),
                 Athlete.is_active == True
             ).all()
-            
+
             # Create comprehensive date groups including all planned data
             date_groups = {}
-            
+
             # First, populate with planned workouts
             for workout in planned_workouts:
                 workout_date = workout.workout_date if isinstance(workout.workout_date, date) else workout.workout_date.date()
                 date_key = workout_date.strftime('%Y-%m-%d')
-                
+
                 if date_key not in date_groups:
                     date_groups[date_key] = {
                         'date': workout_date,
@@ -262,7 +262,7 @@ def get_filtered_summary_data(period='week'):
                         'total_actual': 0,
                         'completion_rate': 0
                     }
-                
+
                 athlete = Athlete.query.get(workout.athlete_id)
                 if athlete and athlete.is_active:
                     athlete_key = workout.athlete_id
@@ -273,15 +273,15 @@ def get_filtered_summary_data(period='week'):
                             'actual': 0,
                             'status': 'Planned'
                         }
-                    
+
                     date_groups[date_key]['athlete_data'][athlete_key]['planned'] += workout.planned_distance_km or 0
                     date_groups[date_key]['total_planned'] += workout.planned_distance_km or 0
-            
+
             # Then, overlay with actual summary data
             for summary in summaries:
                 summary_date = summary.summary_date if isinstance(summary.summary_date, date) else summary.summary_date.date()
                 date_key = summary_date.strftime('%Y-%m-%d')
-                
+
                 if date_key not in date_groups:
                     date_groups[date_key] = {
                         'date': summary_date,
@@ -292,7 +292,7 @@ def get_filtered_summary_data(period='week'):
                         'total_actual': 0,
                         'completion_rate': 0
                     }
-                
+
                 athlete = Athlete.query.get(summary.athlete_id)
                 if athlete and athlete.is_active:
                     athlete_key = summary.athlete_id
@@ -312,50 +312,50 @@ def get_filtered_summary_data(period='week'):
                         if date_groups[date_key]['athlete_data'][athlete_key]['planned'] == 0:
                             date_groups[date_key]['athlete_data'][athlete_key]['planned'] = summary.planned_distance_km or 0
                             date_groups[date_key]['total_planned'] += summary.planned_distance_km or 0
-                    
+
                     date_groups[date_key]['total_actual'] += summary.actual_distance_km or 0
-            
+
             # Convert athlete_data to athletes list and get latest 10 dates
             for date_key in date_groups:
                 date_groups[date_key]['athletes'] = list(date_groups[date_key]['athlete_data'].values())
                 date_groups[date_key].pop('athlete_data', None)
-            
+
             sorted_dates = sorted(date_groups.keys(), reverse=True)[:10]
             result_data = []
             for date_key in sorted_dates:
                 result_data.append(date_groups[date_key])
-            
+
         elif period == 'week':
             # Define week start as May 19, 2025 (Week 1)
             base_date = datetime(2025, 5, 19).date()  # Week 1 starts May 19
-            
+
             # Calculate current week number
             current_date = end_date.date()
             days_since_base = (current_date - base_date).days
             weeks_since_base = days_since_base // 7
-            
+
             week_groups = {}
             # Get latest 10 weeks
             start_week = max(0, weeks_since_base - 9)
             end_week = weeks_since_base + 1
-            
+
             for week_num in range(start_week, end_week):
                 week_start = base_date + timedelta(weeks=week_num)
                 week_end = week_start + timedelta(days=6)
-                
+
                 # Get both planned workouts and summaries for this week
                 week_planned = db.session.query(PlannedWorkout).join(Athlete).filter(
                     PlannedWorkout.workout_date >= week_start,
                     PlannedWorkout.workout_date <= week_end,
                     Athlete.is_active == True
                 ).all()
-                
+
                 week_summaries = db.session.query(DailySummary).join(Athlete).filter(
                     DailySummary.summary_date >= week_start,
                     DailySummary.summary_date <= week_end,
                     Athlete.is_active == True
                 ).all()
-                
+
                 week_key = f"week-{week_num + 1}"
                 week_groups[week_key] = {
                     'date': week_start,
@@ -365,10 +365,10 @@ def get_filtered_summary_data(period='week'):
                     'total_actual': 0,
                     'completion_rate': 0
                 }
-                
+
                 # Aggregate weekly data starting with planned workouts
                 athlete_weekly_data = {}
-                
+
                 # First, add all planned workouts
                 for workout in week_planned:
                     athlete_id = workout.athlete_id
@@ -382,10 +382,10 @@ def get_filtered_summary_data(period='week'):
                                 'completed_days': 0,
                                 'total_days': 0
                             }
-                    
+
                     if athlete_id in athlete_weekly_data:
                         athlete_weekly_data[athlete_id]['planned'] += workout.planned_distance_km or 0
-                
+
                 # Then, overlay with actual summary data
                 for summary in week_summaries:
                     athlete_id = summary.athlete_id
@@ -399,17 +399,17 @@ def get_filtered_summary_data(period='week'):
                                 'completed_days': 0,
                                 'total_days': 0
                             }
-                    
+
                     if athlete_id in athlete_weekly_data:
                         # Update planned only if it wasn't set from workout data
                         if athlete_weekly_data[athlete_id]['planned'] == 0:
                             athlete_weekly_data[athlete_id]['planned'] += summary.planned_distance_km or 0
-                        
+
                         athlete_weekly_data[athlete_id]['actual'] += summary.actual_distance_km or 0
                         athlete_weekly_data[athlete_id]['total_days'] += 1
                         if summary.status in ['On Track', 'Over-performed']:
                             athlete_weekly_data[athlete_id]['completed_days'] += 1
-                
+
                 # Calculate totals and completion rates
                 for athlete_data in athlete_weekly_data.values():
                     week_groups[week_key]['total_planned'] += athlete_data['planned']
@@ -417,50 +417,50 @@ def get_filtered_summary_data(period='week'):
                     completion_rate = (athlete_data['completed_days'] / athlete_data['total_days'] * 100) if athlete_data['total_days'] > 0 else 0
                     athlete_data['status'] = 'On Track' if completion_rate >= 80 else 'Needs Improvement'
                     week_groups[week_key]['athletes'].append(athlete_data)
-            
+
             result_data = [week_groups[key] for key in sorted(week_groups.keys()) if week_groups[key]['total_planned'] > 0 or week_groups[key]['athletes']][-10:]
-            
+
         else:  # month
             # Get monthly data with May-25 format, starting from May 2025
             month_groups = {}
             current_year = end_date.year
             current_month = end_date.month
-            
+
             for i in range(10):  # Latest 10 months
                 month_year = current_year
                 month_num = current_month - i
-                
+
                 if month_num <= 0:
                     month_num += 12
                     month_year -= 1
-                
+
                 # Skip months before May 2025 (when data starts)
                 if month_year < 2025 or (month_year == 2025 and month_num < 5):
                     continue
-                
+
                 month_start = datetime(month_year, month_num, 1).date()
                 if month_num == 12:
                     month_end = datetime(month_year + 1, 1, 1).date() - timedelta(days=1)
                 else:
                     month_end = datetime(month_year, month_num + 1, 1).date() - timedelta(days=1)
-                
+
                 # Get both planned workouts and summaries for this month
                 month_planned = db.session.query(PlannedWorkout).join(Athlete).filter(
                     PlannedWorkout.workout_date >= month_start,
                     PlannedWorkout.workout_date <= month_end,
                     Athlete.is_active == True
                 ).all()
-                
+
                 month_summaries = db.session.query(DailySummary).join(Athlete).filter(
                     DailySummary.summary_date >= month_start,
                     DailySummary.summary_date <= month_end,
                     Athlete.is_active == True
                 ).all()
-                
+
                 # Format month as May-25, Jun-25, etc.
                 month_label = f"{month_start.strftime('%b')}-{str(month_year)[2:]}"
                 month_key = f"{month_year}-{month_num:02d}"
-                
+
                 month_groups[month_key] = {
                     'date': month_start,
                     'period_label': month_label,
@@ -469,10 +469,10 @@ def get_filtered_summary_data(period='week'):
                     'total_actual': 0,
                     'completion_rate': 0
                 }
-                
+
                 # Aggregate monthly data by athlete starting with planned workouts
                 athlete_monthly_data = {}
-                
+
                 # First, add all planned workouts
                 for workout in month_planned:
                     athlete_id = workout.athlete_id
@@ -486,10 +486,10 @@ def get_filtered_summary_data(period='week'):
                                 'completed_days': 0,
                                 'total_days': 0
                             }
-                    
+
                     if athlete_id in athlete_monthly_data:
                         athlete_monthly_data[athlete_id]['planned'] += workout.planned_distance_km or 0
-                
+
                 # Then, overlay with actual summary data
                 for summary in month_summaries:
                     athlete_id = summary.athlete_id
@@ -503,17 +503,17 @@ def get_filtered_summary_data(period='week'):
                                 'completed_days': 0,
                                 'total_days': 0
                             }
-                    
+
                     if athlete_id in athlete_monthly_data:
                         # Update planned only if it wasn't set from workout data
                         if athlete_monthly_data[athlete_id]['planned'] == 0:
                             athlete_monthly_data[athlete_id]['planned'] += summary.planned_distance_km or 0
-                        
+
                         athlete_monthly_data[athlete_id]['actual'] += summary.actual_distance_km or 0
                         athlete_monthly_data[athlete_id]['total_days'] += 1
                         if summary.status in ['On Track', 'Over-performed']:
                             athlete_monthly_data[athlete_id]['completed_days'] += 1
-                
+
                 # Calculate totals and completion rates
                 for athlete_data in athlete_monthly_data.values():
                     month_groups[month_key]['total_planned'] += athlete_data['planned']
@@ -521,7 +521,7 @@ def get_filtered_summary_data(period='week'):
                     completion_rate = (athlete_data['completed_days'] / athlete_data['total_days'] * 100) if athlete_data['total_days'] > 0 else 0
                     athlete_data['status'] = 'On Track' if completion_rate >= 80 else 'Needs Improvement'
                     month_groups[month_key]['athletes'].append(athlete_data)
-            
+
             result_data = [month_groups[key] for key in sorted(month_groups.keys()) if month_groups[key]['total_planned'] > 0 or month_groups[key]['athletes']][-10:]
 
         # Calculate completion rates for all periods
@@ -628,7 +628,7 @@ def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter=
     try:
         # Calculate current week based on May 19, 2025 as Week 1 start
         base_date = datetime(2025, 5, 19)
-        
+
         # Determine date range based on period
         if period_filter == 'day':
             if start_date_filter and end_date_filter:
@@ -669,7 +669,7 @@ def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter=
             key = f"{summary.athlete_id}_{summary.summary_date}"
             if key not in unique_summaries:
                 unique_summaries[key] = summary
-        
+
         summaries = list(unique_summaries.values())
 
         # Process summaries with athlete information
@@ -702,6 +702,7 @@ def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter=
 
         # Calculate aggregate statistics
         variance = ((total_actual - total_planned) / total_planned * 100) if total_planned > 0 else 0
+```python
         completion_rate = len([s for s in enhanced_summaries if s['status'] in ['On Track', 'Over-performed']]) / len(enhanced_summaries) * 100 if enhanced_summaries else 0
 
         return {
@@ -773,7 +774,7 @@ def sync_activities():
     try:
         # Get all active athletes
         all_athletes = db.session.query(Athlete).filter_by(is_active=True).order_by(Athlete.name).all()
-        
+
         # Get current WhatsApp configuration (placeholder for now)
         whatsapp_config = {
             'enabled': False,
@@ -781,17 +782,17 @@ def sync_activities():
             'api_key': '',
             'notification_time': '08:00'
         }
-        
+
         # Set date defaults
         today = datetime.now()
         yesterday = today - timedelta(days=1)
-        
+
         return render_template('sync_activities.html',
                                all_athletes=all_athletes,
                                whatsapp_config=whatsapp_config,
                                today=today,
                                yesterday=yesterday)
-                               
+
     except Exception as e:
         logger.error(f"Error loading sync activities page: {e}")
         flash(f"Error loading page: {e}", "error")
@@ -904,14 +905,71 @@ def upload_training_plan():
     return redirect(url_for('training_plan'))
 
 
+@app.route('/api/athlete-progress-data')
+def api_athlete_progress_data():
+    """API endpoint for enhanced athlete progress data"""
+    try:
+        athletes = db.session.query(Athlete).filter_by(is_active=True).all()
+        progress_data = []
+
+        for athlete in athletes:
+            # Get recent activities for metrics calculation
+            recent_activities = db.session.query(Activity).filter(
+                Activity.athlete_id == athlete.id,
+                Activity.start_date >= datetime.now() - timedelta(days=30)
+            ).all()
+
+            # Calculate average pace (convert from m/s if needed)
+            avg_pace = 0
+            total_heart_rate = 0
+            total_elevation = 0
+            pace_count = 0
+            hr_count = 0
+
+            for activity in recent_activities:
+                if activity.average_speed and activity.average_speed > 0:
+                    # Convert m/s to min/km
+                    pace_min_per_km = 1000 / (activity.average_speed * 60)
+                    if 3 <= pace_min_per_km <= 8:  # Reasonable pace range
+                        avg_pace += pace_min_per_km
+                        pace_count += 1
+
+                if activity.average_heartrate and activity.average_heartrate > 0:
+                    total_heart_rate += activity.average_heartrate
+                    hr_count += 1
+
+                if activity.total_elevation_gain:
+                    total_elevation += activity.total_elevation_gain
+
+            progress_data.append({
+                'id': athlete.id,
+                'name': athlete.name,
+                'avg_pace': round(avg_pace / pace_count, 1) if pace_count > 0 else 0,
+                'avg_heart_rate': round(total_heart_rate / hr_count) if hr_count > 0 else 0,
+                'total_elevation': round(total_elevation),
+                'activity_count': len(recent_activities)
+            })
+
+        return jsonify({
+            'success': True,
+            'athletes': progress_data
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching athlete progress data: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
 @app.route('/api/manual-run', methods=['POST'])
-def manual_run():
+def api_manual_run():
     """API endpoint to manually trigger daily tasks"""
     try:
         # Get target date from request with better error handling
         target_date_str = None
         sync_type = 'range'  # Default to range sync
-        
+
         if request.is_json and request.json:
             target_date_str = request.json.get('date')
             sync_type = request.json.get('type', 'range')
@@ -1116,7 +1174,7 @@ def remove_inactive_athletes():
         athletes_without_strava = db.session.query(Athlete).filter(
             Athlete.refresh_token.is_(None)
         ).all()
-        
+
         removed_count = 0
         for athlete in athletes_without_strava:
             # Remove associated planned workouts and daily summaries first
@@ -1127,12 +1185,12 @@ def remove_inactive_athletes():
 
         db.session.commit()
         logger.info(f"Removed {removed_count} inactive athletes")
-        
+
         return jsonify({
             "success": True, 
             "message": f"Removed {removed_count} athletes without Strava connection"
         })
-        
+
     except Exception as e:
         logger.error(f"Error removing inactive athletes: {e}")
         db.session.rollback()
@@ -1146,7 +1204,7 @@ def api_training_plan_data():
         workouts = db.session.query(PlannedWorkout).join(Athlete).filter(
             Athlete.is_active == True
         ).order_by(PlannedWorkout.workout_date.desc()).limit(100).all()
-        
+
         workout_data = []
         for workout in workouts:
             athlete = Athlete.query.get(workout.athlete_id)
@@ -1159,9 +1217,9 @@ def api_training_plan_data():
                 'workout_type': workout.workout_type or 'Easy Run',
                 'notes': workout.notes or ''
             })
-        
+
         return jsonify({'success': True, 'workouts': workout_data})
-        
+
     except Exception as e:
         logger.error(f"Error getting training plan data: {e}")
         return jsonify({'success': False, 'message': str(e)})
@@ -1183,10 +1241,10 @@ def api_save_training_plan():
     try:
         data = request.get_json()
         workouts = data.get('workouts', [])
-        
+
         saved_count = 0
         updated_count = 0
-        
+
         for workout_data in workouts:
             athlete = db.session.query(Athlete).filter_by(name=workout_data['athlete_name']).first()
             if not athlete:
@@ -1194,15 +1252,15 @@ def api_save_training_plan():
                 athlete = Athlete(name=workout_data['athlete_name'], is_active=True)
                 db.session.add(athlete)
                 db.session.flush()
-            
+
             workout_date = datetime.strptime(workout_data['date'], '%Y-%m-%d').date()
-            
+
             # Check if workout already exists
             existing_workout = db.session.query(PlannedWorkout).filter_by(
                 athlete_id=athlete.id,
                 workout_date=workout_date
             ).first()
-            
+
             if existing_workout:
                 # Update existing
                 existing_workout.planned_distance_km = float(workout_data['distance_km'])
@@ -1222,14 +1280,14 @@ def api_save_training_plan():
                 )
                 db.session.add(new_workout)
                 saved_count += 1
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True, 
             'message': f'Training plan saved: {saved_count} new, {updated_count} updated'
         })
-        
+
     except Exception as e:
         logger.error(f"Error saving training plan: {e}")
         db.session.rollback()
@@ -1241,7 +1299,7 @@ def sync_current():
     try:
         # Sync full date range from May 19, 2025 to current date
         success = run_manual_task()  # This will trigger date range sync
-        
+
         start_date = datetime(2025, 5, 19)
         end_date = datetime.now()
 
@@ -1267,14 +1325,14 @@ def api_sync_activities():
         start_date_str = data.get('start_date')
         end_date_str = data.get('end_date')
         athlete_id = data.get('athlete_id')
-        
+
         # Parse dates
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-        
+
         # Validate date range
         days_diff = (end_date - start_date).days + 1
-        
+
         if sync_type == 'individual':
             if not athlete_id:
                 return jsonify({"success": False, "message": "Athlete ID required for individual sync"})
@@ -1283,17 +1341,17 @@ def api_sync_activities():
         elif sync_type == 'all':
             if days_diff > 2:
                 return jsonify({"success": False, "message": "All athletes sync limited to 2 days"})
-        
+
         # Perform sync
         from scheduler import sync_athlete_activities, process_daily_performance
-        
+
         sync_results = []
-        
+
         if sync_type == 'individual':
             athlete = Athlete.query.get(athlete_id)
             if not athlete:
                 return jsonify({"success": False, "message": "Athlete not found"})
-                
+
             # Sync activities for the date range
             current_date = start_date
             while current_date <= end_date:
@@ -1304,7 +1362,7 @@ def api_sync_activities():
                 except Exception as e:
                     sync_results.append(f"{athlete.name} - {current_date.strftime('%Y-%m-%d')}: Error - {str(e)}")
                 current_date += timedelta(days=1)
-                
+
         else:  # all athletes
             athletes = db.session.query(Athlete).filter_by(is_active=True).all()
             current_date = start_date
@@ -1319,20 +1377,20 @@ def api_sync_activities():
                         logger.error(f"Error syncing {athlete.name} for {current_date}: {e}")
                 sync_results.append(f"All athletes - {current_date.strftime('%Y-%m-%d')}: {day_total} total activities")
                 current_date += timedelta(days=1)
-        
+
         # Log sync operation
         log_sync_operation(sync_type, start_date_str, end_date_str, athlete_id, True, sync_results)
-        
+
         return jsonify({
             "success": True, 
             "message": f"Sync completed successfully for {sync_type} from {start_date_str} to {end_date_str}",
             "details": sync_results
         })
-        
+
     except Exception as e:
         error_msg = f"Sync failed: {str(e)}"
         logger.error(error_msg)
-        
+
         # Log failed sync operation
         log_sync_operation(
             data.get('type', 'unknown') if 'data' in locals() else 'unknown',
@@ -1342,7 +1400,7 @@ def api_sync_activities():
             False,
             [error_msg]
         )
-        
+
         return jsonify({"success": False, "message": error_msg})
 
 
@@ -1351,18 +1409,18 @@ def api_whatsapp_config():
     """API endpoint to save WhatsApp configuration"""
     try:
         config = request.get_json()
-        
+
         # Store configuration in database or config file
         # For now, we'll use a simple file-based storage
         import json
         config_file = 'whatsapp_config.json'
-        
+
         with open(config_file, 'w') as f:
             json.dump(config, f)
-        
+
         logger.info("WhatsApp configuration saved successfully")
         return jsonify({"success": True, "message": "Configuration saved successfully"})
-        
+
     except Exception as e:
         error_msg = f"Failed to save WhatsApp configuration: {str(e)}"
         logger.error(error_msg)
@@ -1376,29 +1434,29 @@ def api_test_whatsapp():
         # Load WhatsApp configuration
         import json
         config_file = 'whatsapp_config.json'
-        
+
         try:
             with open(config_file, 'r') as f:
                 config = json.load(f)
         except FileNotFoundError:
             return jsonify({"success": False, "message": "WhatsApp configuration not found"})
-        
+
         if not config.get('enabled', False):
             return jsonify({"success": False, "message": "WhatsApp notifications are disabled"})
-        
+
         # Send test message using the notifier
         from notifier import WhatsAppNotifier
         notifier = WhatsAppNotifier()
-        
+
         test_message = f"🧪 Test notification from Marathon Dashboard\n📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n✅ Configuration is working correctly!"
-        
+
         success = notifier.send_message(config.get('phone_number'), test_message)
-        
+
         if success:
             return jsonify({"success": True, "message": "Test notification sent successfully"})
         else:
             return jsonify({"success": False, "message": "Failed to send test notification"})
-        
+
     except Exception as e:
         error_msg = f"Test notification failed: {str(e)}"
         logger.error(error_msg)
@@ -1411,12 +1469,12 @@ def api_sync_history():
     try:
         # Read sync history from logs or database
         history = []
-        
+
         # Get recent system logs related to sync operations
         recent_logs = db.session.query(SystemLog).filter(
             SystemLog.log_type.in_(['SYNC_SUCCESS', 'SYNC_FAILED'])
         ).order_by(SystemLog.created_at.desc()).limit(10).all()
-        
+
         for log in recent_logs:
             history.append({
                 'timestamp': log.created_at.isoformat(),
@@ -1425,9 +1483,9 @@ def api_sync_history():
                 'status': 'success' if log.log_type == 'SYNC_SUCCESS' else 'failed',
                 'duration': 'N/A'  # Could be calculated if we store start/end times
             })
-        
+
         return jsonify(history)
-        
+
     except Exception as e:
         logger.error(f"Error getting sync history: {e}")
         return jsonify([])
@@ -1440,21 +1498,21 @@ def log_sync_operation(sync_type, start_date, end_date, athlete_id, success, det
         if athlete_id:
             athlete = Athlete.query.get(athlete_id)
             athlete_name = athlete.name if athlete else f"Athlete {athlete_id}"
-        
+
         log_type = "SYNC_SUCCESS" if success else "SYNC_FAILED"
         message = f"Sync {sync_type} - {athlete_name} ({start_date} to {end_date})"
         details_str = "; ".join(details) if details else ""
-        
+
         system_log = SystemLog(
             log_date=datetime.now(),
             log_type=log_type,
             message=message,
             details=details_str
         )
-        
+
         db.session.add(system_log)
         db.session.commit()
-        
+
     except Exception as e:
         logger.error(f"Failed to log sync operation: {e}")
         db.session.rollback()
@@ -1491,7 +1549,7 @@ def debug_km_mismatch(athlete_id, date):
     """Debug route to investigate KM mismatches for specific athlete and date"""
     try:
         target_date = datetime.strptime(date, '%Y-%m-%d').date()
-        
+
         # Get planned workout
         planned_workout = db.session.query(PlannedWorkout).filter(
             and_(
@@ -1499,7 +1557,7 @@ def debug_km_mismatch(athlete_id, date):
                 func.date(PlannedWorkout.workout_date) == target_date
             )
         ).first()
-        
+
         # Get activities for that date using date-only comparison
         activities = db.session.query(Activity).filter(
             and_(
@@ -1507,13 +1565,13 @@ def debug_km_mismatch(athlete_id, date):
                 func.date(Activity.start_date) == target_date
             )
         ).all()
-        
+
         # Get daily summary
         daily_summary = db.session.query(DailySummary).filter_by(
             athlete_id=athlete_id,
             summary_date=target_date
         ).first()
-        
+
         # Get athlete info
         athlete = Athlete.query.get(athlete_id)
         start_of_day = datetime.combine(target_date, datetime.min.time())
@@ -1558,9 +1616,9 @@ def debug_km_mismatch(athlete_id, date):
                 'date_range_end': end_of_day.isoformat()
             }
         }
-        
+
         return jsonify(debug_info)
-        
+
     except Exception as e:
         logger.error(f"Error in debug route: {e}")
         return jsonify({'error': str(e)}), 500
@@ -1572,19 +1630,19 @@ def debug_comprehensive(athlete_id, date):
     try:
         target_date = datetime.strptime(date, '%Y-%m-%d').date()
         athlete = Athlete.query.get(athlete_id)
-        
+
         if not athlete:
             return jsonify({'error': 'Athlete not found'}), 404
-        
+
         # Get all planned workouts for this athlete
         all_planned = db.session.query(PlannedWorkout).filter_by(athlete_id=athlete_id).all()
-        
+
         # Get all activities for this athlete
         all_activities = db.session.query(Activity).filter_by(athlete_id=athlete_id).all()
-        
+
         # Get all daily summaries for this athlete
         all_summaries = db.session.query(DailySummary).filter_by(athlete_id=athlete_id).all()
-        
+
         # Focus on specific date
         planned_workout = db.session.query(PlannedWorkout).filter(
             and_(
@@ -1592,10 +1650,10 @@ def debug_comprehensive(athlete_id, date):
                 func.date(PlannedWorkout.workout_date) == target_date
             )
         ).first()
-        
+
         start_of_day = datetime.combine(target_date, datetime.min.time())
         end_of_day = start_of_day + timedelta(days=1)
-        
+
         activities = db.session.query(Activity).filter(
             and_(
                 Activity.athlete_id == athlete_id,
@@ -1603,19 +1661,19 @@ def debug_comprehensive(athlete_id, date):
                 Activity.start_date < end_of_day
             )
         ).all()
-        
+
         daily_summary = db.session.query(DailySummary).filter_by(
             athlete_id=athlete_id,
             summary_date=target_date
         ).first()
-        
+
         # Check for data processing issues
         from data_processor import DataProcessor
         processor = DataProcessor()
-        
+
         # Manually process the data to see what happens
         manual_processing = processor.process_athlete_daily_performance(athlete_id, target_date)
-        
+
         debug_info = {
             'athlete_info': {
                 'id': athlete.id,
@@ -1697,9 +1755,9 @@ def debug_comprehensive(athlete_id, date):
                 ]
             }
         }
-        
+
         return jsonify(debug_info)
-        
+
     except Exception as e:
         logger.error(f"Error in comprehensive debug route: {e}")
         return jsonify({'error': str(e), 'traceback': str(e)}), 500

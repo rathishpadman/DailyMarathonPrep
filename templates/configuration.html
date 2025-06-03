@@ -1,209 +1,113 @@
-
 <!DOCTYPE html>
 {% extends "base.html" %}
-{% block title %}Configuration - Marathon Training{% endblock %}
+
+{% block title %}Configuration - Marathon Training Dashboard{% endblock %}
+
 {% block content %}
 <div class="container">
-    <!-- Page Header -->
-    <div class="row mb-4">
+    <div class="row">
         <div class="col-12">
-            <div class="card">
+            <h1 class="display-5 mb-4">
+                <i data-feather="settings" class="me-3"></i>
+                System Configuration
+            </h1>
+
+            <!-- Optimal Values Configuration -->
+            <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
-                        <i data-feather="settings" class="me-2"></i>
-                        System Configuration
+                        <i data-feather="target" class="me-2"></i>
+                        Optimal Training Values
                     </h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted">Configure system-wide settings including tracking dates, API configurations, and notification preferences.</p>
-                </div>
-            </div>
-        </div>
-    </div>
+                    <form id="optimalValuesForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Athlete</label>
+                                    <select class="form-select" id="config_athlete_id">
+                                        <option value="">Global Defaults</option>
+                                    </select>
+                                </div>
 
-    <!-- Training Configuration -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="card-title mb-0">Training Configuration</h6>
-                </div>
-                <div class="card-body">
-                    <form id="trainingConfigForm">
-                        <div class="mb-3">
-                            <label for="startDate" class="form-label">Tracking Start Date</label>
-                            <input type="date" class="form-control" id="startDate" value="2025-05-19">
-                            <div class="form-text">Date from which to start tracking athlete performance</div>
+                                <div class="mb-3">
+                                    <label class="form-label">Optimal Distance per Session (km)</label>
+                                    <input type="number" class="form-control" id="optimal_distance" 
+                                           step="0.1" min="0" value="10.0">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Optimal Pace (min/km)</label>
+                                    <input type="number" class="form-control" id="optimal_pace" 
+                                           step="0.1" min="0" value="5.5">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Weekly Distance Target (km)</label>
+                                    <input type="number" class="form-control" id="weekly_target" 
+                                           step="1" min="0" value="50">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Optimal Heart Rate (bpm)</label>
+                                    <input type="number" class="form-control" id="optimal_hr" 
+                                           min="60" max="220" value="150">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Maximum Heart Rate (bpm)</label>
+                                    <input type="number" class="form-control" id="max_hr" 
+                                           min="60" max="220" value="180">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Optimal Elevation Gain per Session (m)</label>
+                                    <input type="number" class="form-control" id="optimal_elevation" 
+                                           min="0" value="100">
+                                </div>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="endDate" class="form-label">Tracking End Date</label>
-                            <input type="date" class="form-control" id="endDate">
-                            <div class="form-text">End date for tracking (leave blank for ongoing tracking)</div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i data-feather="save" class="me-1"></i>
+                                Save Configuration
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="loadOptimalValues()">
+                                <i data-feather="refresh-cw" class="me-1"></i>
+                                Reset to Defaults
+                            </button>
                         </div>
-                        <div class="mb-3">
-                            <label for="syncFrequency" class="form-label">Sync Frequency</label>
-                            <select class="form-select" id="syncFrequency">
-                                <option value="3">3 times per day (9 AM, 5 PM, 10 PM)</option>
-                                <option value="2">2 times per day (9 AM, 9 PM)</option>
-                                <option value="1">Once per day (9 AM)</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save Training Config</button>
                     </form>
                 </div>
             </div>
-        </div>
 
-        <div class="col-md-6">
+            <!-- Athlete Performance Charts -->
             <div class="card">
                 <div class="card-header">
-                    <h6 class="card-title mb-0">Strava API Configuration</h6>
-                </div>
-                <div class="card-body">
-                    <form id="stravaConfigForm">
-                        <div class="mb-3">
-                            <label for="stravaClientId" class="form-label">Strava Client ID</label>
-                            <input type="text" class="form-control" id="stravaClientId" placeholder="Enter Strava Client ID">
-                        </div>
-                        <div class="mb-3">
-                            <label for="stravaClientSecret" class="form-label">Strava Client Secret</label>
-                            <input type="password" class="form-control" id="stravaClientSecret" placeholder="Enter Strava Client Secret">
-                        </div>
-                        <div class="mb-3">
-                            <label for="stravaRedirectUri" class="form-label">Redirect URI</label>
-                            <input type="url" class="form-control" id="stravaRedirectUri" 
-                                   value="{{ request.url_root }}auth/strava/callback" readonly>
-                            <div class="form-text">This URL must be configured in your Strava app settings</div>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save Strava Config</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- WhatsApp Configuration -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="card-title mb-0">WhatsApp Notifications</h6>
-                </div>
-                <div class="card-body">
-                    <form id="whatsappConfigForm">
-                        <div class="mb-3">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="whatsappEnabled">
-                                <label class="form-check-label" for="whatsappEnabled">
-                                    Enable WhatsApp Notifications
-                                </label>
-                            </div>
-                        </div>
-                        <div id="whatsappSettings" style="display: none;">
-                            <div class="mb-3">
-                                <label for="whatsappApiUrl" class="form-label">WhatsApp API URL</label>
-                                <input type="url" class="form-control" id="whatsappApiUrl" placeholder="Enter WhatsApp API URL">
-                            </div>
-                            <div class="mb-3">
-                                <label for="whatsappAccessToken" class="form-label">Access Token</label>
-                                <input type="password" class="form-control" id="whatsappAccessToken" placeholder="Enter Access Token">
-                            </div>
-                            <div class="mb-3">
-                                <label for="whatsappPhoneNumber" class="form-label">Phone Number</label>
-                                <input type="tel" class="form-control" id="whatsappPhoneNumber" placeholder="+1234567890">
-                            </div>
-                            <div class="mb-3">
-                                <label for="notificationTime" class="form-label">Daily Notification Time</label>
-                                <input type="time" class="form-control" id="notificationTime" value="08:00">
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save WhatsApp Config</button>
-                        <button type="button" class="btn btn-outline-secondary" id="testWhatsapp">Test Notification</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="card-title mb-0">Email Configuration (Fallback)</h6>
-                </div>
-                <div class="card-body">
-                    <form id="emailConfigForm">
-                        <div class="mb-3">
-                            <label for="smtpServer" class="form-label">SMTP Server</label>
-                            <input type="text" class="form-control" id="smtpServer" placeholder="smtp.gmail.com">
-                        </div>
-                        <div class="mb-3">
-                            <label for="smtpPort" class="form-label">SMTP Port</label>
-                            <input type="number" class="form-control" id="smtpPort" value="587">
-                        </div>
-                        <div class="mb-3">
-                            <label for="emailUser" class="form-label">Email Username</label>
-                            <input type="email" class="form-control" id="emailUser" placeholder="your-email@gmail.com">
-                        </div>
-                        <div class="mb-3">
-                            <label for="emailPassword" class="form-label">Email Password</label>
-                            <input type="password" class="form-control" id="emailPassword" placeholder="App Password">
-                        </div>
-                        <div class="mb-3">
-                            <label for="recipientEmails" class="form-label">Recipient Emails</label>
-                            <input type="text" class="form-control" id="recipientEmails" 
-                                   placeholder="email1@example.com,email2@example.com">
-                            <div class="form-text">Comma-separated list of email addresses</div>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save Email Config</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- System Status -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="card-title mb-0">System Status</h6>
+                    <h5 class="card-title mb-0">
+                        <i data-feather="bar-chart-2" class="me-2"></i>
+                        Athlete Performance Charts
+                    </h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <div class="mb-2">
-                                    <i data-feather="database" class="text-primary" style="width: 2rem; height: 2rem;"></i>
-                                </div>
-                                <h6>Database</h6>
-                                <span class="badge bg-success">Connected</span>
-                            </div>
+                        <div class="col-md-6">
+                            <canvas id="distanceChart" width="400" height="200"></canvas>
                         </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <div class="mb-2">
-                                    <i data-feather="activity" class="text-info" style="width: 2rem; height: 2rem;"></i>
-                                </div>
-                                <h6>Strava API</h6>
-                                <span class="badge bg-warning" id="stravaStatus">Not Configured</span>
-                            </div>
+                        <div class="col-md-6">
+                            <canvas id="heartRateChart" width="400" height="200"></canvas>
                         </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <div class="mb-2">
-                                    <i data-feather="message-circle" class="text-success" style="width: 2rem; height: 2rem;"></i>
-                                </div>
-                                <h6>WhatsApp</h6>
-                                <span class="badge bg-secondary" id="whatsappStatus">Disabled</span>
-                            </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <canvas id="paceChart" width="400" height="200"></canvas>
                         </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <div class="mb-2">
-                                    <i data-feather="clock" class="text-warning" style="width: 2rem; height: 2rem;"></i>
-                                </div>
-                                <h6>Scheduler</h6>
-                                <span class="badge bg-success" id="schedulerStatus">Running</span>
-                            </div>
+                        <div class="col-md-6">
+                            <canvas id="elevationChart" width="400" height="200"></canvas>
                         </div>
                     </div>
                 </div>
@@ -212,56 +116,166 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// WhatsApp toggle functionality
-document.getElementById('whatsappEnabled').addEventListener('change', function() {
-    const settings = document.getElementById('whatsappSettings');
-    settings.style.display = this.checked ? 'block' : 'none';
+document.addEventListener('DOMContentLoaded', function() {
+    loadAthletes();
+    loadOptimalValues();
+    initializeCharts();
+
+    document.getElementById('optimalValuesForm').addEventListener('submit', saveOptimalValues);
+    document.getElementById('config_athlete_id').addEventListener('change', loadOptimalValues);
 });
 
-// Form submissions
-document.getElementById('trainingConfigForm').addEventListener('submit', function(e) {
+async function loadAthletes() {
+    try {
+        const response = await fetch('/api/athletes-list');
+        const data = await response.json();
+
+        if (data.success) {
+            const select = document.getElementById('config_athlete_id');
+            data.athletes.forEach(athlete => {
+                const option = document.createElement('option');
+                option.value = athlete.id;
+                option.textContent = athlete.name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading athletes:', error);
+    }
+}
+
+async function loadOptimalValues() {
+    try {
+        const athleteId = document.getElementById('config_athlete_id').value;
+        const response = await fetch(`/api/optimal-values?athlete_id=${athleteId}`);
+        const data = await response.json();
+
+        if (data.success) {
+            document.getElementById('optimal_distance').value = data.values.optimal_distance_km;
+            document.getElementById('optimal_pace').value = data.values.optimal_pace_min_per_km;
+            document.getElementById('optimal_hr').value = data.values.optimal_heart_rate_bpm;
+            document.getElementById('max_hr').value = data.values.max_heart_rate_bpm;
+            document.getElementById('optimal_elevation').value = data.values.optimal_elevation_gain_m;
+            document.getElementById('weekly_target').value = data.values.weekly_distance_target_km;
+        }
+    } catch (error) {
+        console.error('Error loading optimal values:', error);
+    }
+}
+
+async function saveOptimalValues(e) {
     e.preventDefault();
-    // Implementation for saving training config
-    showAlert('Training configuration saved successfully!', 'success');
-});
 
-document.getElementById('stravaConfigForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    // Implementation for saving Strava config
-    showAlert('Strava configuration saved successfully!', 'success');
-});
+    const formData = {
+        athlete_id: document.getElementById('config_athlete_id').value || null,
+        optimal_distance_km: parseFloat(document.getElementById('optimal_distance').value),
+        optimal_pace_min_per_km: parseFloat(document.getElementById('optimal_pace').value),
+        optimal_heart_rate_bpm: parseInt(document.getElementById('optimal_hr').value),
+        max_heart_rate_bpm: parseInt(document.getElementById('max_hr').value),
+        optimal_elevation_gain_m: parseFloat(document.getElementById('optimal_elevation').value),
+        weekly_distance_target_km: parseFloat(document.getElementById('weekly_target').value)
+    };
 
-document.getElementById('whatsappConfigForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    // Implementation for saving WhatsApp config
-    showAlert('WhatsApp configuration saved successfully!', 'success');
-});
+    try {
+        const response = await fetch('/api/optimal-values', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(formData)
+        });
 
-document.getElementById('emailConfigForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    // Implementation for saving email config
-    showAlert('Email configuration saved successfully!', 'success');
-});
+        const data = await response.json();
 
-// Test WhatsApp notification
-document.getElementById('testWhatsapp').addEventListener('click', function() {
-    // Implementation for testing WhatsApp
-    showAlert('Test notification sent!', 'info');
-});
+        if (data.success) {
+            showAlert('success', 'Configuration saved successfully!');
+            updateCharts();
+        } else {
+            showAlert('error', 'Failed to save configuration: ' + data.message);
+        }
+    } catch (error) {
+        showAlert('error', 'Error saving configuration');
+    }
+}
 
-function showAlert(message, type) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-    alertDiv.innerHTML = `
+function initializeCharts() {
+    // Initialize empty charts
+    const ctx1 = document.getElementById('distanceChart').getContext('2d');
+    const ctx2 = document.getElementById('heartRateChart').getContext('2d');
+    const ctx3 = document.getElementById('paceChart').getContext('2d');
+    const ctx4 = document.getElementById('elevationChart').getContext('2d');
+
+    window.charts = {};
+
+    window.charts.distance = new Chart(ctx1, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: { 
+            responsive: true,
+            plugins: { title: { display: true, text: 'Distance vs Optimal' } }
+        }
+    });
+
+    window.charts.heartRate = new Chart(ctx2, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: { 
+            responsive: true,
+            plugins: { title: { display: true, text: 'Heart Rate vs Optimal' } }
+        }
+    });
+
+    window.charts.pace = new Chart(ctx3, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: { 
+            responsive: true,
+            plugins: { title: { display: true, text: 'Pace vs Optimal' } }
+        }
+    });
+
+    window.charts.elevation = new Chart(ctx4, {
+        type: 'bar',
+        data: { labels: [], datasets: [] },
+        options: { 
+            responsive: true,
+            plugins: { title: { display: true, text: 'Elevation vs Optimal' } }
+        }
+    });
+
+    updateCharts();
+}
+
+async function updateCharts() {
+    // Fetch athlete performance data and update charts
+    try {
+        const response = await fetch('/api/athlete-performance-charts');
+        const data = await response.json();
+
+        if (data.success) {
+            // Update each chart with actual vs optimal data
+            Object.keys(window.charts).forEach(chartType => {
+                if (data[chartType]) {
+                    window.charts[chartType].data = data[chartType];
+                    window.charts[chartType].update();
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error updating charts:', error);
+    }
+}
+
+function showAlert(type, message) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    document.querySelector('.container').prepend(alertDiv);
-    
-    setTimeout(() => {
-        alertDiv.remove();
-    }, 5000);
+    document.querySelector('.container').insertBefore(alert, document.querySelector('.container').firstChild);
+
+    setTimeout(() => alert.remove(), 5000);
 }
 </script>
 {% endblock %}

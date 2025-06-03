@@ -37,6 +37,10 @@ class Activity(db.Model):
     distance_km = db.Column(db.Float, nullable=False)
     moving_time_seconds = db.Column(db.Integer, nullable=False)
     pace_min_per_km = db.Column(db.Float, nullable=True)
+    average_speed = db.Column(db.Float, nullable=True)  # m/s
+    average_heartrate = db.Column(db.Float, nullable=True)  # bpm
+    max_heartrate = db.Column(db.Float, nullable=True)  # bpm
+    total_elevation_gain = db.Column(db.Float, nullable=True)  # meters
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (db.UniqueConstraint('strava_activity_id',
                                           name='unique_strava_activity'), )
@@ -110,3 +114,21 @@ class StravaApiUsage(db.Model):
     last_sync_time = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class OptimalValues(db.Model):
+    """Model for storing optimal training values configuration"""
+    __tablename__ = 'optimal_values'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=True)  # Null for global defaults
+    optimal_distance_km = db.Column(db.Float, default=10.0)  # km per session
+    optimal_pace_min_per_km = db.Column(db.Float, default=5.5)  # minutes per km
+    optimal_heart_rate_bpm = db.Column(db.Integer, default=150)  # beats per minute
+    max_heart_rate_bpm = db.Column(db.Integer, default=180)  # max safe heart rate
+    optimal_elevation_gain_m = db.Column(db.Float, default=100.0)  # meters per session
+    weekly_distance_target_km = db.Column(db.Float, default=50.0)  # km per week
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (UniqueConstraint('athlete_id', name='uq_optimal_values_athlete'),)

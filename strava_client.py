@@ -176,7 +176,11 @@ class StravaClient:
                 'start_date': datetime.fromisoformat(activity.get('start_date_local', '').replace('Z', '+00:00')),
                 'distance_km': distance_km,
                 'moving_time_seconds': activity.get('moving_time', 0),
-                'pace_min_per_km': pace_min_per_km
+                'pace_min_per_km': pace_min_per_km,
+                'average_speed': activity.get('average_speed'),  # m/s
+                'average_heartrate': activity.get('average_heartrate'),  # bpm
+                'max_heartrate': activity.get('max_heartrate'),  # bpm
+                'total_elevation_gain': activity.get('total_elevation_gain')  # meters
             }
 
             return processed_data

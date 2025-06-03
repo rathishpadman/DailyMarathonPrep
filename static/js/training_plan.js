@@ -102,12 +102,115 @@ function renderTrainingPlanTable() {
     setTimeout(() => feather.replace(), 100);
 }
 
+let isEditMode = false;
+
 function createTrainingPlanRow(workout, index) {
     const row = document.createElement('tr');
-    row.innerHTML = `
+    const formattedDate = workout.date || '';
+    
+    if (isEditMode) {
+        row.innerHTML = `
+            <td>
+                <input type="date" class="form-control form-control-sm" 
+                       value="${formattedDate}" 
+                       onchange="updateWorkoutData(${index}, 'date', this.value)">
+            </td>
+            <td>
+                <select class="form-control form-control-sm" 
+                        onchange="updateWorkoutData(${index}, 'athlete_name', this.value)">
+                    ${getAthleteOptions(workout.athlete_name)}
+                </select>
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm" 
+                       value="${workout.distance_km}" step="0.1" min="0"
+                       onchange="updateWorkoutData(${index}, 'distance_km', this.value)">
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm" 
+                       value="${workout.pace_min_per_km}" step="0.1" min="0"
+                       onchange="updateWorkoutData(${index}, 'pace_min_per_km', this.value)">
+            </td>
+            <td>
+                <select class="form-control form-control-sm" 
+                        onchange="updateWorkoutData(${index}, 'workout_type', this.value)">
+                    ${getWorkoutTypeOptions(workout.workout_type)}
+                </select>
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm" 
+                       value="${workout.notes || ''}" 
+                       onchange="updateWorkoutData(${index}, 'notes', this.value)">
+            </td>
+            <td>
+                <button type="button" class="btn btn-danger btn-sm" 
+                        onclick="removeRow(${index})" title="Remove">
+                    <i data-feather="trash-2"></i>
+                </button>
+            </td>
+        `;
+    } else {
+        // Read-only mode
+        row.innerHTML = `
+            <td>${formatDate(formattedDate)}</td>
+            <td>${workout.athlete_name || ''}</td>
+            <td>${workout.distance_km || 0} km</td>
+            <td>${workout.pace_min_per_km || 0} min/km</td>
+            <td>${workout.workout_type || ''}</td>
+            <td>${workout.notes || ''}</td>
+            <td>
+                <button type="button" class="btn btn-primary btn-sm" 
+                        onclick="editSingleRow(${index})" title="Edit">
+                    <i data-feather="edit"></i>
+                </button>
+            </td>
+        `;
+    }
+
+    // Re-initialize feather icons for the new row
+    setTimeout(() => feather.replace(), 0);
+
+    return row;
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+    } catch (e) {
+        return dateStr;
+    }
+}
+
+function toggleEditMode() {
+    isEditMode = !isEditMode;
+    const editButton = document.querySelector('button[onclick="toggleEditMode()"]');
+    if (editButton) {
+        editButton.innerHTML = isEditMode ? 
+            '<i data-feather="eye" class="me-1"></i>View Mode' : 
+            '<i data-feather="edit" class="me-1"></i>Edit Mode';
+    }
+    renderTrainingPlanTable();
+    feather.replace();
+}
+
+function editSingleRow(index) {
+    // Convert single row to edit mode
+    const row = document.querySelector(`#training_plan_tbody tr:nth-child(${index + 1})`);
+    if (row) {
+        const workout = currentTrainingData[index];
+        row.innerHTML = createEditableRowContent(workout, index);
+        feather.replace();
+    }
+}
+
+function createEditableRowContent(workout, index) {
+    const formattedDate = workout.date || '';
+    return `
         <td>
             <input type="date" class="form-control form-control-sm" 
-                   value="${workout.date}" 
+                   value="${formattedDate}" 
                    onchange="updateWorkoutData(${index}, 'date', this.value)">
         </td>
         <td>
@@ -134,21 +237,30 @@ function createTrainingPlanRow(workout, index) {
         </td>
         <td>
             <input type="text" class="form-control form-control-sm" 
-                   value="${workout.notes}" 
+                   value="${workout.notes || ''}" 
                    onchange="updateWorkoutData(${index}, 'notes', this.value)">
         </td>
         <td>
-            <button type="button" class="btn btn-danger btn-sm" 
-                    onclick="removeRow(${index})" title="Remove">
-                <i data-feather="trash-2"></i>
+            <button type="button" class="btn btn-success btn-sm me-1" 
+                    onclick="saveRow(${index})" title="Save">
+                <i data-feather="check"></i>
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" 
+                    onclick="cancelEditRow(${index})" title="Cancel">
+                <i data-feather="x"></i>
             </button>
         </td>
     `;
+}
 
-    // Re-initialize feather icons for the new row
-    setTimeout(() => feather.replace(), 0);
+function saveRow(index) {
+    // Save and return to read-only mode
+    renderTrainingPlanTable();
+}
 
-    return row;
+function cancelEditRow(index) {
+    // Cancel changes and return to read-only mode
+    renderTrainingPlanTable();
 }
 
 function getAthleteOptions(selectedAthlete) {

@@ -104,31 +104,28 @@ class SystemLog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class StravaApiUsage(db.Model):
-    __tablename__ = 'strava_api_usage'
-
+    """Model for tracking Strava API usage"""
     id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, nullable=False, default=datetime.utcnow().date)
-    requests_15min = db.Column(db.Integer, default=0)
-    requests_daily = db.Column(db.Integer, default=0)
-    last_request_time = db.Column(db.DateTime)
-    last_sync_time = db.Column(db.DateTime)
+    date = db.Column(db.Date, nullable=False, unique=True)
+    requests_made = db.Column(db.Integer, default=0)
+    limit_reached = db.Column(db.Boolean, default=False)
+    last_sync_time = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class OptimalValues(db.Model):
-    """Model for storing optimal training values configuration"""
-    __tablename__ = 'optimal_values'
-    
+    """Model for storing optimal performance values for athletes"""
     id = db.Column(db.Integer, primary_key=True)
-    athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=True)  # Null for global defaults
-    optimal_distance_km = db.Column(db.Float, default=10.0)  # km per session
-    optimal_pace_min_per_km = db.Column(db.Float, default=5.5)  # minutes per km
-    optimal_heart_rate_bpm = db.Column(db.Integer, default=150)  # beats per minute
-    max_heart_rate_bpm = db.Column(db.Integer, default=180)  # max safe heart rate
-    optimal_elevation_gain_m = db.Column(db.Float, default=100.0)  # meters per session
-    weekly_distance_target_km = db.Column(db.Float, default=50.0)  # km per week
+    athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=True)  # None for global defaults
+    optimal_distance_km = db.Column(db.Float, default=10.0)
+    optimal_pace_min_per_km = db.Column(db.Float, default=5.5)
+    optimal_heart_rate_bpm = db.Column(db.Integer, default=150)
+    max_heart_rate_bpm = db.Column(db.Integer, default=180)
+    optimal_elevation_gain_m = db.Column(db.Float, default=100.0)
+    weekly_distance_target_km = db.Column(db.Float, default=50.0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    __table_args__ = (UniqueConstraint('athlete_id', name='uq_optimal_values_athlete'),)
+
+    # Relationships
+    athlete = db.relationship('Athlete', backref='optimal_values', lazy=True)

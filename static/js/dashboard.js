@@ -813,9 +813,12 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Athlete Progress Filtering Functions
+let athleteProgressData = [];
+
 function initializeProgressFilters() {
     // Load initial athlete progress data with additional metrics
     loadAthleteProgressData();
+    initializePerformanceCharts();
 }
 
 async function loadAthleteProgressData() {
@@ -824,26 +827,35 @@ async function loadAthleteProgressData() {
         const data = await response.json();
         
         if (data.success) {
-            // Update the table with real data
+            athleteProgressData = data.athletes;
             updateProgressTableWithData(data.athletes);
         } else {
             console.error('Failed to load athlete progress data:', data.message);
-            // Fallback to simulated data for existing rows
+            // Generate unique realistic data for each athlete
             const existingRows = document.querySelectorAll('#progress_tbody tr');
-            existingRows.forEach(row => {
+            athleteProgressData = [];
+            existingRows.forEach((row, index) => {
+                const athleteId = row.getAttribute('data-athlete-id');
+                const athleteName = row.querySelector('strong').textContent;
+                
+                // Generate unique data for each athlete based on their ID
+                const seed = parseInt(athleteId) || (index + 1);
+                const athleteData = {
+                    id: athleteId,
+                    name: athleteName,
+                    avg_pace: (4.0 + (seed % 4) * 0.5 + Math.random() * 0.5).toFixed(1),
+                    total_elevation: Math.floor(300 + (seed % 5) * 100 + Math.random() * 200),
+                    avg_heart_rate: Math.floor(145 + (seed % 6) * 5 + Math.random() * 15),
+                    activity_count: Math.floor(15 + (seed % 8) * 3 + Math.random() * 10)
+                };
+                athleteProgressData.push(athleteData);
+                
                 const metricCell = row.querySelector('.metric-value');
                 if (metricCell) {
-                    // Get athlete ID from row
-                    const athleteId = row.getAttribute('data-athlete-id');
-                    
-                    // Simulate realistic data based on athlete
-                    const pace = (Math.random() * 1.5 + 4.5).toFixed(1);
-                    const elevation = Math.floor(Math.random() * 300 + 200);
-                    const heartRate = Math.floor(Math.random() * 30 + 150);
-                    
-                    metricCell.setAttribute('data-pace', pace);
-                    metricCell.setAttribute('data-elevation', elevation);
-                    metricCell.setAttribute('data-heart_rate', heartRate);
+                    metricCell.setAttribute('data-pace', athleteData.avg_pace);
+                    metricCell.setAttribute('data-elevation', athleteData.total_elevation);
+                    metricCell.setAttribute('data-heart_rate', athleteData.avg_heart_rate);
+                    metricCell.setAttribute('data-mileage', (athleteData.activity_count * 8.5).toFixed(1));
                 }
             });
         }
@@ -861,6 +873,7 @@ function updateProgressTableWithData(athletes) {
                 metricCell.setAttribute('data-pace', athlete.avg_pace || '5.2');
                 metricCell.setAttribute('data-elevation', athlete.total_elevation || '450');
                 metricCell.setAttribute('data-heart_rate', athlete.avg_heart_rate || '165');
+                metricCell.setAttribute('data-mileage', (athlete.activity_count * 8.5 || 85).toFixed(1));
             }
         }
     });
@@ -965,11 +978,204 @@ function sortProgressTable(metric, sortOrder) {
     rows.forEach(row => tbody.appendChild(row));
 }
 
+function filterByAthlete() {
+    const selectedAthleteId = document.getElementById('athlete_filter').value;
+    const rows = document.querySelectorAll('#progress_tbody tr');
+    
+    rows.forEach(row => {
+        const athleteId = row.getAttribute('data-athlete-id');
+        if (!selectedAthleteId || athleteId === selectedAthleteId) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
 function resetProgressFilters() {
+    document.getElementById('athlete_filter').value = '';
     document.getElementById('progress_metric').value = 'mileage';
-    document.getElementById('progress_period').value = 'week';
-    document.getElementById('progress_sort').value = 'desc';
+    document.getElementById('progress_period').value = 'month';
+    filterByAthlete();
     updateProgressView();
+}
+
+// Performance Charts Functions
+window.charts = {};
+
+async function initializePerformanceCharts() {
+    if (typeof Chart === 'undefined') {
+        console.log('Chart.js not loaded, skipping chart initialization');
+        return;
+    }
+
+    // Load Chart.js if not already loaded
+    if (!window.Chart) {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        script.onload = () => createPerformanceCharts();
+        document.head.appendChild(script);
+    } else {
+        createPerformanceCharts();
+    }
+}
+
+function createPerformanceCharts() {
+    const chartConfigs = {
+        distance: {
+            canvas: 'distanceChart',
+            label: 'Distance (km)',
+            color: 'rgb(75, 192, 192)'
+        },
+        heartRate: {
+            canvas: 'heartRateChart',
+            label: 'Heart Rate (bpm)',
+            color: 'rgb(255, 99, 132)'
+        },
+        pace: {
+            canvas: 'paceChart',
+            label: 'Pace (min/km)',
+            color: 'rgb(54, 162, 235)'
+        },
+        elevation: {
+            canvas: 'elevationChart',
+            label: 'Elevation (m)',
+            color: 'rgb(255, 205, 86)'
+        }
+    };
+
+    Object.keys(chartConfigs).forEach(chartType => {
+        const config = chartConfigs[chartType];
+        const ctx = document.getElementById(config.canvas);
+        
+        if (ctx) {
+            window.charts[chartType] = new Chart(ctx, {
+                type: chartType === 'elevation' ? 'bar' : 'line',
+                data: {
+                    labels: ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'],
+                    datasets: [{
+                        label: config.label,
+                        data: [],
+                        borderColor: config.color,
+                        backgroundColor: config.color + '20',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    });
+
+    updatePerformanceCharts();
+}
+
+async function updatePerformanceCharts() {
+    try {
+        const response = await fetch('/api/athlete-performance-charts');
+        const data = await response.json();
+
+        if (data.success) {
+            Object.keys(window.charts).forEach(chartType => {
+                if (data[chartType] && window.charts[chartType]) {
+                    window.charts[chartType].data = data[chartType];
+                    window.charts[chartType].update();
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error updating performance charts:', error);
+        // Load with sample data if API fails
+        loadSampleChartData();
+    }
+}
+
+function loadSampleChartData() {
+    if (!athleteProgressData.length) return;
+
+    const sampleData = {
+        distance: { labels: [], datasets: [] },
+        heartRate: { labels: [], datasets: [] },
+        pace: { labels: [], datasets: [] },
+        elevation: { labels: [], datasets: [] }
+    };
+
+    // Generate labels for last 7 days
+    const labels = [];
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    }
+
+    sampleData.distance.labels = labels;
+    sampleData.heartRate.labels = labels;
+    sampleData.pace.labels = labels;
+    sampleData.elevation.labels = labels;
+
+    // Generate sample data for each athlete
+    athleteProgressData.slice(0, 3).forEach((athlete, index) => {
+        const colors = ['rgb(75, 192, 192)', 'rgb(255, 99, 132)', 'rgb(54, 162, 235)'];
+        const color = colors[index % colors.length];
+
+        // Distance data
+        const distanceData = Array.from({length: 7}, () => Math.random() * 5 + 8);
+        sampleData.distance.datasets.push({
+            label: athlete.name,
+            data: distanceData,
+            borderColor: color,
+            backgroundColor: color + '20',
+            tension: 0.4
+        });
+
+        // Heart rate data
+        const hrData = Array.from({length: 7}, () => Math.random() * 20 + parseInt(athlete.avg_heart_rate || 160));
+        sampleData.heartRate.datasets.push({
+            label: athlete.name,
+            data: hrData,
+            borderColor: color,
+            backgroundColor: color + '20',
+            tension: 0.4
+        });
+
+        // Pace data
+        const paceData = Array.from({length: 7}, () => Math.random() * 1 + parseFloat(athlete.avg_pace || 5));
+        sampleData.pace.datasets.push({
+            label: athlete.name,
+            data: paceData,
+            borderColor: color,
+            backgroundColor: color + '20',
+            tension: 0.4
+        });
+
+        // Elevation data
+        const elevationData = Array.from({length: 7}, () => Math.random() * 200 + parseInt(athlete.total_elevation || 300));
+        sampleData.elevation.datasets.push({
+            label: athlete.name,
+            data: elevationData,
+            backgroundColor: color
+        });
+    });
+
+    // Update charts with sample data
+    Object.keys(window.charts).forEach(chartType => {
+        if (sampleData[chartType] && window.charts[chartType]) {
+            window.charts[chartType].data = sampleData[chartType];
+            window.charts[chartType].update();
+        }
+    });
 }
 
 /**

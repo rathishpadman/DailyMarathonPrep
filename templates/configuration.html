@@ -80,6 +80,10 @@
                                 <i data-feather="refresh-cw" class="me-1"></i>
                                 Reset to Defaults
                             </button>
+                            <button type="button" class="btn btn-success" onclick="applyGlobalDefaults()">
+                                <i data-feather="users" class="me-1"></i>
+                                Apply to All Athletes
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -276,6 +280,29 @@ function showAlert(type, message) {
     document.querySelector('.container').insertBefore(alert, document.querySelector('.container').firstChild);
 
     setTimeout(() => alert.remove(), 5000);
+}
+
+async function applyGlobalDefaults() {
+    if (!confirm('This will apply the current global defaults to all athletes who don\'t have custom values. Continue?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/apply-global-defaults', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('success', data.message);
+        } else {
+            showAlert('danger', data.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Error applying global defaults: ' + error.message);
+    }
 }
 </script>
 {% endblock %}

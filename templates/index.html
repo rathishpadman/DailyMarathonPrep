@@ -91,32 +91,39 @@
                     <!-- Progress Filters -->
                     <div class="row g-2">
                         <div class="col-md-3">
-                            <select class="form-select form-select-sm" id="progress_metric" onchange="updateProgressView()">
-                                <option value="mileage">Total Mileage</option>
-                                <option value="pace">Average Pace</option>
-                                <option value="elevation">Elevation Gain</option>
-                                <option value="heart_rate">Heart Rate</option>
+                            <label for="athlete_filter" class="form-label">Filter by Athlete</label>
+                            <select id="athlete_filter" class="form-select" onchange="filterByAthlete()">
+                                <option value="">All Athletes</option>
+                                {% for athlete in all_athletes %}
+                                {% if athlete.is_active %}
+                                <option value="{{ athlete.id }}">{{ athlete.name }}</option>
+                                {% endif %}
+                                {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <select class="form-select form-select-sm" id="progress_period" onchange="updateProgressView()">
-                                <option value="week">This Week</option>
-                                <option value="month">This Month</option>
+                            <label for="progress_metric" class="form-label">Metric</label>
+                            <select id="progress_metric" class="form-select" onchange="updateProgressView()">
+                                <option value="mileage">Total Distance (km)</option>
+                                <option value="pace">Average Pace (min/km)</option>
+                                <option value="heart_rate">Avg Heart Rate (bpm)</option>
+                                <option value="elevation">Elevation Gain (m)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="progress_period" class="form-label">Period</label>
+                            <select id="progress_period" class="form-select" onchange="updateProgressView()">
+                                <option value="month">Last 30 Days</option>
                                 <option value="total">All Time</option>
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <select class="form-select form-select-sm" id="progress_sort" onchange="updateProgressView()">
-                                <option value="desc">Highest First</option>
-                                <option value="asc">Lowest First</option>
-                                <option value="name">By Name</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <button class="btn btn-outline-secondary btn-sm w-100" onclick="resetProgressFilters()">
-                                <i data-feather="refresh-ccw" class="me-1"></i>
-                                Reset
-                            </button>
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetProgressFilters()">
+                                    <i data-feather="refresh-cw" class="me-1"></i>Reset
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -204,6 +211,42 @@
         </div>
     </div>
 
+    <!-- Athlete Performance Charts -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="bar-chart-2" class="me-2"></i>
+                        Athlete Performance Charts
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <h6>Distance Performance (km)</h6>
+                            <canvas id="distanceChart" width="400" height="200"></canvas>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <h6>Heart Rate (bpm)</h6>
+                            <canvas id="heartRateChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <h6>Pace Performance (min/km)</h6>
+                            <canvas id="paceChart" width="400" height="200"></canvas>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <h6>Elevation Gain (m)</h6>
+                            <canvas id="elevationChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Summary Table with Filters -->
     <div class="row mb-4">
         <div class="col-12">
@@ -280,7 +323,7 @@
             </div>
         </div>
     </div>
-    
+
 
                 <!-- Last Sync Information -->
                 <div class="row mb-4">
@@ -314,23 +357,110 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% block scripts %}
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
-// Initialize dashboard when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Feather icons
-    feather.replace();
+// Enhanced dashboard functionality for index page
 
-    // Setup period filter event listeners for index page
-    const periodButtons = document.querySelectorAll('.period-filter');
-    periodButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            const period = this.getAttribute('data-period');
-            updateSummaryData(period);
-        });
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+
+    // Initialize progress filters
+    initializeProgressFilters();
 });
+
+// Summary data filtering functions
+function updateSummaryData(period) {
+    console.log('Updating summary data for period:', period);
+
+    // Update active button state
+    document.querySelectorAll('.period-filter').forEach(btn => {
+        btn.classList.remove('active', 'btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+
+    const activeButton = document.querySelector(`[data-period="${period}"]`);
+    if (activeButton) {
+        activeButton.classList.add('active', 'btn-primary');
+        activeButton.classList.remove('btn-outline-primary');
+    }
+
+    // Show loading state
+    const tableContainer = document.getElementById('summaryTableContainer');
+    if (tableContainer) {
+        tableContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border"></div></div>';
+    }
+
+    // Fetch new data
+    fetch(`/api/summary-stats/${period}`)
+        .then(response => response.json())
+        .then(data => {
+            updateSummaryTable(data.summary_data, period);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (tableContainer) {
+                tableContainer.innerHTML = '<div class="alert alert-danger">Error loading data</div>';
+            }
+        });
+}
+
+function updateSummaryTable(summaryData, period) {
+    const tableContainer = document.getElementById('summaryTableContainer');
+    if (!tableContainer || !summaryData || summaryData.length === 0) {
+        if (tableContainer) {
+            tableContainer.innerHTML = '<div class="text-center p-4"><p class="text-muted">No data available.</p></div>';
+        }
+        return;
+    }
+
+    let tableHtml = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        <th>Athletes</th>
+                        <th>Planned (km)</th>
+                        <th>Actual (km)</th>
+                        <th>Completion Rate</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    summaryData.forEach(item => {
+        let statusBadge = '';
+        if (item.completion_rate >= 80) {
+            statusBadge = '<span class="badge bg-success">Excellent</span>';
+        } else if (item.completion_rate >= 60) {
+            statusBadge = '<span class="badge bg-warning">Good</span>';
+        } else {
+            statusBadge = '<span class="badge bg-danger">Needs Improvement</span>';
+        }
+
+        tableHtml += `
+            <tr>
+                <td>${item.period_label || new Date(item.date).toLocaleDateString()}</td>
+                <td>${item.athletes ? item.athletes.length : 0}</td>
+                <td>${item.total_planned.toFixed(1)}</td>
+                <td>${item.total_actual.toFixed(1)}</td>
+                <td>${item.completion_rate.toFixed(1)}%</td>
+                <td>${statusBadge}</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += '</tbody></table></div>';
+    tableContainer.innerHTML = tableHtml;
+}
 </script>
 {% endblock %}

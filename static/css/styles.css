@@ -39,8 +39,20 @@
 /* Chart containers */
 .chart-container {
     position: relative;
-    height: 400px;
+    height: 300px;
     width: 100%;
+}
+
+/* Chart canvas containers with fixed height */
+canvas {
+    max-height: 300px !important;
+}
+
+/* Prevent chart expansion */
+.card-body canvas {
+    width: 100% !important;
+    height: 300px !important;
+    max-height: 300px !important;
 }
 
 /* Responsive adjustments */

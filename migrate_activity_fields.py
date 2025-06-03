@@ -1,6 +1,7 @@
 
 from app import app, db
 from models import Activity
+from sqlalchemy import text
 
 def migrate_activity_fields():
     """Add new fields to Activity table"""
@@ -14,17 +15,14 @@ def migrate_activity_fields():
             
             for field in new_fields:
                 if field not in columns:
-                    if field == 'average_speed':
-                        db.engine.execute(f'ALTER TABLE activity ADD COLUMN {field} FLOAT')
-                    elif 'heartrate' in field:
-                        db.engine.execute(f'ALTER TABLE activity ADD COLUMN {field} FLOAT')
-                    else:
-                        db.engine.execute(f'ALTER TABLE activity ADD COLUMN {field} FLOAT')
+                    with db.engine.connect() as conn:
+                        conn.execute(text(f'ALTER TABLE activity ADD COLUMN {field} FLOAT'))
+                        conn.commit()
                     print(f"Added column: {field}")
                 else:
                     print(f"Column {field} already exists")
             
-            # Create optimal_values table
+            # Create optimal_values table if it doesn't exist
             db.create_all()
             print("Migration completed successfully")
             

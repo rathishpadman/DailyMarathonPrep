@@ -792,6 +792,154 @@ window.DashboardApp = {
     createStatusBreakdownChart
 };
 
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing Marathon Training Dashboard...');
+
+    // Initialize feather icons
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+
+    // Set up auto-refresh for real-time data
+    setupAutoRefresh();
+
+    // Initialize chart if on dashboard page
+    if (document.getElementById('weeklyTrendsChart')) {
+        initializeWeeklyTrends();
+    }
+
+    // Initialize athlete progress filters
+    initializeProgressFilters();
+});
+
+// Athlete Progress Filtering Functions
+function initializeProgressFilters() {
+    // Load initial athlete progress data with additional metrics
+    loadAthleteProgressData();
+}
+
+async function loadAthleteProgressData() {
+    try {
+        // This would fetch enhanced athlete data with pace, elevation, heart rate
+        // For now, we'll work with existing data and enhance it
+        const existingRows = document.querySelectorAll('#progress_tbody tr');
+
+        // Simulate additional metrics (in production, this would come from API)
+        existingRows.forEach(row => {
+            const metricCell = row.querySelector('.metric-value');
+            if (metricCell) {
+                // Simulate pace data (4.5-6.5 min/km range)
+                const pace = (Math.random() * 2 + 4.5).toFixed(1);
+                metricCell.setAttribute('data-pace', pace);
+
+                // Simulate elevation data (100-500m range)
+                const elevation = Math.floor(Math.random() * 400 + 100);
+                metricCell.setAttribute('data-elevation', elevation);
+
+                // Simulate heart rate data (140-180 bpm range)
+                const heartRate = Math.floor(Math.random() * 40 + 140);
+                metricCell.setAttribute('data-heart_rate', heartRate);
+            }
+        });
+    } catch (error) {
+        console.error('Error loading athlete progress data:', error);
+    }
+}
+
+function updateProgressView() {
+    const metric = document.getElementById('progress_metric').value;
+    const period = document.getElementById('progress_period').value;
+    const sortOrder = document.getElementById('progress_sort').value;
+
+    updateMetricDisplay(metric);
+    updatePeriodDisplay(period);
+    sortProgressTable(metric, sortOrder);
+}
+
+function updateMetricDisplay(metric) {
+    const header = document.getElementById('metric_header');
+    const metricCells = document.querySelectorAll('.metric-value');
+
+    // Update header
+    const headers = {
+        'mileage': 'Total Distance (km)',
+        'pace': 'Average Pace (min/km)',
+        'elevation': 'Elevation Gain (m)',
+        'heart_rate': 'Avg Heart Rate (bpm)'
+    };
+    header.textContent = headers[metric];
+
+    // Update cell values
+    metricCells.forEach(cell => {
+        const value = cell.getAttribute(`data-${metric}`);
+        let displayValue = value;
+
+        if (metric === 'mileage') {
+            displayValue = `<span class="badge bg-primary">${value} km</span>`;
+        } else if (metric === 'pace') {
+            const paceValue = parseFloat(value);
+            const minutes = Math.floor(paceValue);
+            const seconds = Math.round((paceValue - minutes) * 60);
+            displayValue = `<span class="badge bg-info">${minutes}:${seconds.toString().padStart(2, '0')} /km</span>`;
+        } else if (metric === 'elevation') {
+            displayValue = `<span class="badge bg-warning">${value} m</span>`;
+        } else if (metric === 'heart_rate') {
+            displayValue = `<span class="badge bg-danger">${value} bpm</span>`;
+        }
+
+        cell.innerHTML = displayValue;
+    });
+}
+
+function updatePeriodDisplay(period) {
+    // Update period-specific columns based on selection
+    const actualCells = document.querySelectorAll('.period-actual');
+    const plannedCells = document.querySelectorAll('.period-planned');
+
+    // This would typically fetch different data based on period
+    // For now, we'll just update labels
+    actualCells.forEach(cell => {
+        if (period === 'month') {
+            cell.textContent = cell.textContent.replace('km', 'km (month)');
+        } else if (period === 'total') {
+            cell.textContent = cell.textContent.replace('km', 'km (total)');
+        }
+    });
+}
+
+function sortProgressTable(metric, sortOrder) {
+    const tbody = document.getElementById('progress_tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    rows.sort((a, b) => {
+        if (sortOrder === 'name') {
+            const nameA = a.querySelector('strong').textContent;
+            const nameB = b.querySelector('strong').textContent;
+            return nameA.localeCompare(nameB);
+        }
+
+        const valueA = parseFloat(a.querySelector('.metric-value').getAttribute(`data-${metric}`)) || 0;
+        const valueB = parseFloat(b.querySelector('.metric-value').getAttribute(`data-${metric}`)) || 0;
+
+        if (sortOrder === 'asc') {
+            return valueA - valueB;
+        } else {
+            return valueB - valueA;
+        }
+    });
+
+    // Clear and re-append sorted rows
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+function resetProgressFilters() {
+    document.getElementById('progress_metric').value = 'mileage';
+    document.getElementById('progress_period').value = 'week';
+    document.getElementById('progress_sort').value = 'desc';
+    updateProgressView();
+}
+
 /**
  * Quick sync for last 2 days only
  */

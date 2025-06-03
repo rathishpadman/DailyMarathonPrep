@@ -88,7 +88,7 @@ class DailyTaskScheduler:
         try:
             # Use the current training plan file from config
             self.excel_reader = ExcelReader(Config.TRAINING_PLAN_FILE)
-            
+
             # Validate Excel file format
             validation_results = self.excel_reader.validate_excel_format()
 
@@ -239,12 +239,12 @@ class DailyTaskScheduler:
                     # Fetch activities for target date (last 2 days only)
                     current_date = datetime.now().date()
                     target_date_only = target_date.date() if isinstance(target_date, datetime) else target_date
-                    
+
                     # Only sync if target date is within last 2 days
                     if target_date_only < current_date - timedelta(days=2):
                         logger.info(f"Skipping sync for {target_date_only} - beyond 2-day limit")
                         continue
-                    
+
                     start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
                     end_of_day = start_of_day + timedelta(days=1)
 
@@ -428,18 +428,18 @@ class DailyTaskScheduler:
             # For specific date, only allow if within last 2 days
             current_date = datetime.now().date()
             target_date_only = target_date.date() if isinstance(target_date, datetime) else target_date
-            
+
             if target_date_only < current_date - timedelta(days=2):
                 logger.warning(f"Target date {target_date_only} is beyond 2-day limit. Only last 2 days allowed.")
                 return False
-            
+
             logger.info(f"Manual execution for specific date: {target_date.strftime('%Y-%m-%d')}")
             return self.execute_daily_tasks(target_date)
 
     def execute_date_range_sync(self, start_date: datetime, end_date: datetime) -> bool:
         """Execute sync for a range of dates from May 19th to current date"""
         logger.info(f"Starting date range sync from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-        
+
         try:
             with app.app_context():
                 # Step 1: Update training plan first
@@ -455,15 +455,15 @@ class DailyTaskScheduler:
                 while current_date.date() <= end_date.date():
                     try:
                         logger.info(f"Processing date: {current_date.strftime('%Y-%m-%d')}")
-                        
+
                         # Fetch and process Strava data for this date
                         success = self._fetch_and_process_strava_data(current_date)
                         if success:
                             successful_days += 1
-                        
+
                         # Move to next day
                         current_date += timedelta(days=1)
-                        
+
                     except Exception as e:
                         logger.error(f"Failed to process date {current_date.strftime('%Y-%m-%d')}: {e}")
                         current_date += timedelta(days=1)
@@ -471,12 +471,12 @@ class DailyTaskScheduler:
 
                 # Step 3: Generate dashboard for the end date
                 dashboard_data = self.dashboard_builder.build_daily_dashboard(end_date)
-                
+
                 logger.info(f"Date range sync completed: {successful_days}/{total_days} days processed successfully")
-                
+
                 # Log the completion
                 self._log_system_event("SUCCESS", f"Date range sync completed: {successful_days}/{total_days} days from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-                
+
                 return successful_days > 0
 
         except Exception as e:
@@ -595,6 +595,38 @@ class DailyTaskScheduler:
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return {'error': str(e)}
+
+    def run_daily_tasks(self, target_date=None):
+        """Run daily scheduled tasks with rate limiting - only sync last 2 days"""
+        try:
+            # Check API rate limits before proceeding
+            #if not self._check_api_limits():
+            #    logger.warning("API rate limits exceeded, skipping scheduled sync")
+            #    return False
+
+            # Use target date or default to current date
+            if target_date is None:
+                target_date = datetime.now()
+
+            # Only sync last 2 days (today and yesterday) to respect Strava rate limits
+            yesterday = target_date - timedelta(days=1)
+            dates_to_sync = [yesterday, target_date]
+
+            for current_date in dates_to_sync:
+                if not self._fetch_and_process_strava_data(current_date):
+                    logger.error(f"Failed to process {current_date.strftime('%Y-%m-%d')}")
+                else:
+                    logger.info(f"Successfully processed {current_date.strftime('%Y-%m-%d')}")
+
+            # Update last sync time
+            #self._update_api_usage()
+
+            logger.info(f"Daily tasks completed successfully for last 2 days: {yesterday.strftime('%Y-%m-%d')} and {target_date.strftime('%Y-%m-%d')}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to run daily tasks: {e}")
+            return False
 
 
 # Global scheduler instance

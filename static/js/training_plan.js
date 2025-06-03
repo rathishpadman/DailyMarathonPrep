@@ -79,14 +79,27 @@ async function loadTrainingPlanData() {
 
 function renderTrainingPlanTable() {
     const tableBody = document.getElementById('training_plan_tbody');
-    if (!tableBody) return;
+    if (!tableBody) {
+        console.error('Training plan table body not found');
+        return;
+    }
 
     tableBody.innerHTML = '';
+
+    if (currentTrainingData.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="7" class="text-center text-muted">No training plan data found. Upload a plan or add rows manually.</td>';
+        tableBody.appendChild(row);
+        return;
+    }
 
     currentTrainingData.forEach((workout, index) => {
         const row = createTrainingPlanRow(workout, index);
         tableBody.appendChild(row);
     });
+
+    // Re-initialize feather icons
+    setTimeout(() => feather.replace(), 100);
 }
 
 function createTrainingPlanRow(workout, index) {
@@ -216,7 +229,19 @@ function duplicateAthlete() {
 
 async function saveTrainingPlan() {
     const saveButton = document.querySelector('button[onclick="saveTrainingPlan()"]');
+    if (!saveButton) return;
+    
     const originalText = saveButton.innerHTML;
+
+    // Validate data before saving
+    const validWorkouts = currentTrainingData.filter(workout => 
+        workout.athlete_name && workout.date && workout.distance_km > 0
+    );
+
+    if (validWorkouts.length === 0) {
+        showAlert('warning', 'No valid workouts to save. Please ensure all rows have athlete name, date, and distance > 0.');
+        return;
+    }
 
     saveButton.innerHTML = '<i data-feather="loader" class="me-1"></i> Saving...';
     saveButton.disabled = true;
@@ -228,21 +253,21 @@ async function saveTrainingPlan() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                workouts: currentTrainingData
+                workouts: validWorkouts
             })
         });
 
         const data = await response.json();
 
-        if (data.success) {
-            showAlert('success', data.message);
-            await loadTrainingPlanData(); // Reload data
+        if (response.ok && data.success) {
+            showAlert('success', `✅ ${data.message}`);
+            await loadTrainingPlanData(); // Reload data to show updated IDs
         } else {
-            showAlert('error', 'Failed to save: ' + data.message);
+            showAlert('error', `❌ Failed to save: ${data.message || 'Unknown error'}`);
         }
     } catch (error) {
         console.error('Error saving training plan:', error);
-        showAlert('error', 'Error saving training plan');
+        showAlert('error', '❌ Network error while saving training plan');
     } finally {
         saveButton.innerHTML = originalText;
         saveButton.disabled = false;

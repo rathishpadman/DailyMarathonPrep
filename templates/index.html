@@ -214,16 +214,22 @@
                         <div class="text-center py-4">
                             <i data-feather="inbox" style="width: 3rem; height: 3rem;" class="text-muted mb-3"></i>
                             <p class="text-muted">No training data available for the selected period.</p>
-                            <a href="{{ url_for('sync_activities') }}" class="btn btn-primary">
-                                <i data-feather="refresh-cw" class="me-2"></i>
-                                Sync Activities
-                            </a>
                         </div>
                         {% endif %}
                     </div>
                 </div>
             </div>
         </div>
+    </div>
+                <!-- Last Sync Information -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i data-feather="clock" class="me-2"></i>
+                            <strong>Last Strava Sync:</strong> {{ last_strava_sync }}
+                            <small class="ms-3">Auto-sync runs daily at 9:00 AM to respect Strava rate limits</small>
+                        </div>
+                    </div>
     </div>
 
     <!-- Quick Actions -->
@@ -236,10 +242,6 @@
                         <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
                             <i data-feather="bar-chart" class="me-2"></i>
                             Detailed Dashboard
-                        </a>
-                        <a href="{{ url_for('sync_activities') }}" class="btn btn-outline-success">
-                            <i data-feather="refresh-cw" class="me-2"></i>
-                            Sync Activities
                         </a>
                         <a href="{{ url_for('training_plan') }}" class="btn btn-outline-info">
                             <i data-feather="calendar" class="me-2"></i>

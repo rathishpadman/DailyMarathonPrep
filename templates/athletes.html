@@ -226,6 +226,32 @@
     </div>
     {% endif %}
 
+    <!-- Athlete Progress -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">
+                            <i data-feather="trending-up" class="me-2"></i>
+                            Athlete Progress
+                        </h6>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm" id="progressMetric" onchange="updateProgressView()">
+                                <option value="mileage">Mileage</option>
+                                <option value="pace">Average Pace</option>
+                                <option value="heartrate">Heart Rate</option>
+                                <option value="elevation">Elevation</option>
+                            </select>
+                            <select class="form-select form-select-sm" id="progressPeriod" onchange="updateProgressView()">
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                                <option value="total">Total</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
     <!-- Setup Instructions -->
     <div class="row mt-4">
         <div class="col-12">
@@ -267,10 +293,10 @@
     function toggleAthlete(athleteId) {
         const button = event.target.closest('button');
         const originalContent = button.innerHTML;
-        
+
         button.disabled = true;
         button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-        
+
         fetch(`/api/athlete/${athleteId}/toggle`, {
             method: 'POST',
             headers: {
@@ -294,7 +320,7 @@
             button.innerHTML = originalContent;
         });
     }
-    
+
     function showAlert(message, type) {
         const alertDiv = document.createElement('div');
         alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
@@ -302,16 +328,16 @@
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
-        
+
         const container = document.querySelector('.container');
         container.insertBefore(alertDiv, container.firstChild);
-        
+
         // Auto-dismiss after 5 seconds
         setTimeout(() => {
             alertDiv.remove();
         }, 5000);
     }
-    
+
     // Initialize feather icons when page loads
     document.addEventListener('DOMContentLoaded', function() {
         feather.replace();

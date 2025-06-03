@@ -179,7 +179,7 @@
                                     <th>Distance Variance</th>
                                     <th>Planned Pace</th>
                                     <th>Actual Pace</th>
-                                    <th>Actions</th>
+                                    <th>Notes</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -209,12 +209,7 @@
                                     </td>
                                     <td>{{ "%.2f"|format(summary.planned_pace) if summary.planned_pace else 'N/A' }}</td>
                                     <td>{{ "%.2f"|format(summary.actual_pace) if summary.actual_pace else 'N/A' }}</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-primary" 
-                                                onclick="updateAthlete({{ summary.athlete_id }}, '{{ summary.date.strftime('%Y-%m-%d') }}')">
-                                            <i data-feather="refresh-cw"></i>
-                                        </button>
-                                    </td>
+                                    <td><small>{{ summary.notes or 'No notes' }}</small></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -371,8 +366,3 @@ function toggleDateInputs() {
 }
 </script>
 {% endblock %}
-```
-
-```analysis
-The code replaces the summary tiles section in the dashboard template with updated HTML that includes unique IDs for each tile's heading, which can be useful for dynamically updating these values via JavaScript.
-```

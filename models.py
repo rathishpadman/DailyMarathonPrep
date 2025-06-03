@@ -76,7 +76,7 @@ class DailySummary(db.Model):
                        nullable=True)  # On Track, Under-performed, etc.
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
 
     # Add indexes for better query performance
     __table_args__ = (
@@ -88,7 +88,7 @@ class DailySummary(db.Model):
 
     # This is the KEY change: Ensure only one summary per athlete per day
     __table_args__ = (UniqueConstraint('athlete_id', 'summary_date', name='uq_daily_summary_athlete_date'),)
-    
+
 class SystemLog(db.Model):
     """Model for storing system execution logs"""
     id = db.Column(db.Integer, primary_key=True)
@@ -98,3 +98,15 @@ class SystemLog(db.Model):
     message = db.Column(db.Text, nullable=False)
     details = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class StravaApiUsage(db.Model):
+    __tablename__ = 'strava_api_usage'
+
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False, default=datetime.utcnow().date)
+    requests_15min = db.Column(db.Integer, default=0)
+    requests_daily = db.Column(db.Integer, default=0)
+    last_request_time = db.Column(db.DateTime)
+    last_sync_time = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

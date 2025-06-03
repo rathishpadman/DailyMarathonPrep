@@ -236,7 +236,15 @@ class DailyTaskScheduler:
                     # Commit token updates immediately
                     db.session.commit()
 
-                    # Fetch activities for target date
+                    # Fetch activities for target date (last 2 days only)
+                    current_date = datetime.now().date()
+                    target_date_only = target_date.date() if isinstance(target_date, datetime) else target_date
+                    
+                    # Only sync if target date is within last 2 days
+                    if target_date_only < current_date - timedelta(days=2):
+                        logger.info(f"Skipping sync for {target_date_only} - beyond 2-day limit")
+                        continue
+                    
                     start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
                     end_of_day = start_of_day + timedelta(days=1)
 
@@ -368,17 +376,15 @@ class DailyTaskScheduler:
             db.session.rollback()
 
     def schedule_daily_execution(self):
-        """Schedule the daily task execution - 3 times per day"""
+        """Schedule the daily task execution - once per day to respect rate limits"""
         try:
             # Clear any existing scheduled jobs
             schedule.clear()
 
-            # Schedule 3 syncs per day: 9 AM, 5 PM, and 10 PM
+            # Schedule only once per day at 9 AM to respect Strava rate limits
             schedule.every().day.at("09:00").do(self._safe_execute_daily_tasks)
-            schedule.every().day.at("17:00").do(self._safe_execute_daily_tasks)  # 5 PM
-            schedule.every().day.at("22:00").do(self._safe_execute_daily_tasks)  # 10 PM
 
-            logger.info("Scheduled daily Strava syncs at 9:00 AM, 5:00 PM, and 10:00 PM")
+            logger.info("Scheduled daily Strava sync at 9:00 AM")
 
             # Keep the scheduler running
             while True:
@@ -411,13 +417,21 @@ class DailyTaskScheduler:
             logger.error(f"Failed to start scheduler thread: {e}")
 
     def manual_execution(self, target_date: Optional[datetime] = None) -> bool:
-        """Manually execute tasks for a specific date or date range (for testing/debugging)"""
+        """Manually execute tasks for last 2 days only to respect rate limits"""
         if target_date is None:
-            # Default: sync from May 19, 2025 to current date
-            start_date = datetime(2025, 5, 19)
+            # Default: sync only last 2 days (today and yesterday)
             end_date = datetime.now()
+            start_date = end_date - timedelta(days=1)  # Only yesterday and today
             return self.execute_date_range_sync(start_date, end_date)
         else:
+            # Check if target date is within last 2 days
+            current_date = datetime.now().date()
+            target_date_only = target_date.date() if isinstance(target_date, datetime) else target_date
+            
+            if target_date_only < current_date - timedelta(days=2):
+                logger.warning(f"Target date {target_date_only} is beyond 2-day limit")
+                return False
+            
             logger.info(f"Manual execution for {target_date.strftime('%Y-%m-%d')}")
             return self.execute_daily_tasks(target_date)
 

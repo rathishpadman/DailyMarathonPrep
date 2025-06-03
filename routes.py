@@ -75,6 +75,9 @@ def index():
         # Get all athletes for management
         all_athletes = db.session.query(Athlete).order_by(Athlete.name).all()
 
+        # Get last Strava sync time in IST
+        last_strava_sync = get_last_strava_sync_time()
+
         # Get unified summary data with filtering support
         filter_period = request.args.get('period', 'week')  # day, week, month
         summary_data = get_filtered_summary_data(filter_period)
@@ -91,7 +94,8 @@ def index():
                                all_athletes=all_athletes,
                                summary_data=summary_data,
                                current_period=filter_period,
-                               leader_dashboard=leader_dashboard_data)
+                               leader_dashboard=leader_dashboard_data,
+                               last_strava_sync=last_strava_sync)
 
     except Exception as e:
         logger.error(f"Error loading home page: {e}")
@@ -106,6 +110,28 @@ def index():
                                summary_data=[],
                                current_period='week')
 
+
+def get_last_strava_sync_time():
+    """Get the last Strava sync time in IST"""
+    try:
+        from models import StravaApiUsage
+        import pytz
+        
+        latest_usage = db.session.query(StravaApiUsage).order_by(
+            StravaApiUsage.last_sync_time.desc()
+        ).first()
+        
+        if latest_usage and latest_usage.last_sync_time:
+            # Convert to IST
+            ist = pytz.timezone('Asia/Kolkata')
+            utc_time = latest_usage.last_sync_time.replace(tzinfo=pytz.UTC)
+            ist_time = utc_time.astimezone(ist)
+            return ist_time.strftime('%Y-%m-%d %H:%M:%S IST')
+        
+        return "Never"
+    except Exception as e:
+        logger.error(f"Error getting last sync time: {e}")
+        return "Unknown"
 
 def get_leader_dashboard_data():
     """Get leader dashboard data with athlete-wise consolidated actual runs and previous week data"""
@@ -1112,6 +1138,102 @@ def remove_inactive_athletes():
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)})
 
+
+@app.route('/api/training-plan-data')
+def api_training_plan_data():
+    """Get training plan data for editing"""
+    try:
+        workouts = db.session.query(PlannedWorkout).join(Athlete).filter(
+            Athlete.is_active == True
+        ).order_by(PlannedWorkout.workout_date.desc()).limit(100).all()
+        
+        workout_data = []
+        for workout in workouts:
+            athlete = Athlete.query.get(workout.athlete_id)
+            workout_data.append({
+                'id': workout.id,
+                'athlete_name': athlete.name if athlete else 'Unknown',
+                'date': workout.workout_date.isoformat() if workout.workout_date else '',
+                'distance_km': workout.planned_distance_km or 0,
+                'pace_min_per_km': workout.planned_pace_min_per_km or 0,
+                'workout_type': workout.workout_type or 'Easy Run',
+                'notes': workout.notes or ''
+            })
+        
+        return jsonify({'success': True, 'workouts': workout_data})
+        
+    except Exception as e:
+        logger.error(f"Error getting training plan data: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/athletes-list')
+def api_athletes_list():
+    """Get list of athletes for dropdowns"""
+    try:
+        athletes = db.session.query(Athlete).filter_by(is_active=True).order_by(Athlete.name).all()
+        athlete_data = [{'id': a.id, 'name': a.name} for a in athletes]
+        return jsonify({'success': True, 'athletes': athlete_data})
+    except Exception as e:
+        logger.error(f"Error getting athletes list: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/save-training-plan', methods=['POST'])
+def api_save_training_plan():
+    """Save edited training plan data"""
+    try:
+        data = request.get_json()
+        workouts = data.get('workouts', [])
+        
+        saved_count = 0
+        updated_count = 0
+        
+        for workout_data in workouts:
+            athlete = db.session.query(Athlete).filter_by(name=workout_data['athlete_name']).first()
+            if not athlete:
+                # Create new athlete if needed
+                athlete = Athlete(name=workout_data['athlete_name'], is_active=True)
+                db.session.add(athlete)
+                db.session.flush()
+            
+            workout_date = datetime.strptime(workout_data['date'], '%Y-%m-%d').date()
+            
+            # Check if workout already exists
+            existing_workout = db.session.query(PlannedWorkout).filter_by(
+                athlete_id=athlete.id,
+                workout_date=workout_date
+            ).first()
+            
+            if existing_workout:
+                # Update existing
+                existing_workout.planned_distance_km = float(workout_data['distance_km'])
+                existing_workout.planned_pace_min_per_km = float(workout_data.get('pace_min_per_km', 0))
+                existing_workout.workout_type = workout_data.get('workout_type', 'Easy Run')
+                existing_workout.notes = workout_data.get('notes', '')
+                updated_count += 1
+            else:
+                # Create new
+                new_workout = PlannedWorkout(
+                    athlete_id=athlete.id,
+                    workout_date=workout_date,
+                    planned_distance_km=float(workout_data['distance_km']),
+                    planned_pace_min_per_km=float(workout_data.get('pace_min_per_km', 0)),
+                    workout_type=workout_data.get('workout_type', 'Easy Run'),
+                    notes=workout_data.get('notes', '')
+                )
+                db.session.add(new_workout)
+                saved_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Training plan saved: {saved_count} new, {updated_count} updated'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error saving training plan: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/sync-current', methods=['POST'])
 def sync_current():

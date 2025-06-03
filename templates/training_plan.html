@@ -99,7 +99,7 @@
                             </ul>
                         </div>
                     </div>
-                    
+
                     {% if not validation_results.file_exists %}
                     <div class="alert alert-warning mt-3">
                         <i data-feather="alert-triangle" class="me-2"></i>
@@ -258,48 +258,59 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Athlete</th>
-                                    <th>Distance</th>
-                                    <th>Target Pace</th>
-                                    <th>Workout Type</th>
-                                    <th>Notes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for workout in upcoming_workouts %}
-                                <tr class="{% if workout.workout_date == today %}table-warning{% endif %}">
-                                    <td>
-                                        {{ workout.workout_date.strftime('%Y-%m-%d') }}
-                                        {% if workout.workout_date == today %}
-                                            <span class="badge bg-warning ms-2">Today</span>
-                                        {% endif %}
-                                    </td>
-                                    <td><strong>{{ workout.athlete.name }}</strong></td>
-                                    <td>{{ "%.1f"|format(workout.planned_distance_km) }} km</td>
-                                    <td>
-                                        {% set pace_min = workout.planned_pace_min_per_km|int %}
-                                        {% set pace_sec = ((workout.planned_pace_min_per_km - pace_min) * 60)|int %}
-                                        {{ "%d:%02d"|format(pace_min, pace_sec) }} /km
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-outline-primary">{{ workout.workout_type or 'Regular Run' }}</span>
-                                    </td>
-                                    <td>
-                                        {% if workout.notes %}
-                                            <small class="text-muted">{{ workout.notes[:100] }}{% if workout.notes|length > 100 %}...{% endif %}</small>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    {% if validation_results.file_exists %}
+                        <div class="alert alert-success">
+                            <i data-feather="check-circle" class="me-2"></i>
+                            Training plan file found and validated successfully.
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i data-feather="alert-triangle" class="me-2"></i>
+                            Training plan file not found or invalid format.
+                        </div>
+                    {% endif %}
+
+                    <!-- Editable Training Plan Table -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6>Editable Training Plan</h6>
+                            <div>
+                                <button class="btn btn-sm btn-primary me-2" onclick="addNewRow()">
+                                    <i data-feather="plus" class="me-1"></i>Add Row
+                                </button>
+                                <button class="btn btn-sm btn-success me-2" onclick="saveTrainingPlan()">
+                                    <i data-feather="save" class="me-1"></i>Save Plan
+                                </button>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                        <i data-feather="copy" class="me-1"></i>Copy Athlete
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" onclick="copyAthleteData()">Copy to Another Athlete</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="duplicateAthlete()">Duplicate Athlete</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered" id="trainingPlanTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Athlete Name</th>
+                                        <th>Date</th>
+                                        <th>Distance (km)</th>
+                                        <th>Pace (min/km)</th>
+                                        <th>Workout Type</th>
+                                        <th>Notes</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trainingPlanBody">
+                                    <!-- Table rows will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -326,7 +337,7 @@
                         <input type="file" class="form-control" id="training_file" name="training_file" accept=".xlsx,.xls,.csv" required>
                         <div class="form-text">Choose an Excel file (.xlsx, .xls) or CSV file (.csv) with your training plan</div>
                     </div>
-                    
+
                     <div class="alert alert-info">
                         <i data-feather="info" class="me-2"></i>
                         <strong>Required Format:</strong> Your Excel or CSV file must include these columns:
@@ -358,11 +369,19 @@
     // Initialize feather icons when page loads
     document.addEventListener('DOMContentLoaded', function() {
         feather.replace();
-        
+
         // Add today's date for comparison
         window.date = {
             today: () => new Date().toISOString().split('T')[0]
         };
     });
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/training_plan.js') }}"></script>
+<script>
+    // Training plan specific JavaScript
+    feather.replace();
 </script>
 {% endblock %}

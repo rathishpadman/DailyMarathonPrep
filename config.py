@@ -39,6 +39,11 @@ class Config:
 
     # Application Settings
     DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+    
+    # Strava API Rate Limiting
+    STRAVA_RATE_LIMIT_15MIN = 100  # 100 requests per 15 minutes
+    STRAVA_RATE_LIMIT_DAILY = 1000  # 1000 requests per day
+    STRAVA_REQUEST_TRACKING = True  # Enable request tracking
 
     @classmethod
     def validate_config(cls):

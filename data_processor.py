@@ -180,6 +180,9 @@ class DataProcessor:
     def save_daily_summary(self, performance_summary: Dict) -> bool:
         """Save daily performance summary to database"""
         try:
+            # Update last sync time in Strava API usage
+            self._update_last_sync_time()
+            
             # FIX: Ensure we're working with date objects consistently
             summary_date = performance_summary['summary_date']
             if isinstance(summary_date, datetime):
@@ -406,3 +409,24 @@ class DataProcessor:
             return "0.0 km"
 
         return f"{distance_km:.1f} km"
+    
+    def _update_last_sync_time(self):
+        """Update the last sync time in Strava API usage tracking"""
+        try:
+            from models import StravaApiUsage
+            from app import db
+            
+            today = datetime.now().date()
+            usage = db.session.query(StravaApiUsage).filter_by(date=today).first()
+            
+            if not usage:
+                usage = StravaApiUsage(date=today)
+                db.session.add(usage)
+            
+            usage.last_sync_time = datetime.now()
+            usage.updated_at = datetime.now()
+            db.session.commit()
+            
+        except Exception as e:
+            logger.error(f"Error updating last sync time: {e}")
+            # Don't raise exception as this is not critical

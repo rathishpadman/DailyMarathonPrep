@@ -16,6 +16,71 @@ class StravaClient:
     def __init__(self):
         self.client_id = Config.STRAVA_CLIENT_ID
         self.client_secret = Config.STRAVA_CLIENT_SECRET
+        self.requests_made_15min = 0
+        self.requests_made_daily = 0
+        self.last_request_time = None
+
+    def _check_rate_limits(self) -> bool:
+        """Check if we can make a request without exceeding rate limits"""
+        from models import StravaApiUsage
+        from app import db
+        
+        try:
+            today = datetime.now().date()
+            usage = db.session.query(StravaApiUsage).filter_by(date=today).first()
+            
+            if not usage:
+                usage = StravaApiUsage(date=today, requests_15min=0, requests_daily=0)
+                db.session.add(usage)
+                db.session.commit()
+            
+            # Check 15-minute limit
+            if usage.last_request_time and usage.last_request_time > datetime.now() - timedelta(minutes=15):
+                if usage.requests_15min >= Config.STRAVA_RATE_LIMIT_15MIN:
+                    logger.warning("Strava 15-minute rate limit would be exceeded")
+                    return False
+            else:
+                # Reset 15-minute counter
+                usage.requests_15min = 0
+            
+            # Check daily limit
+            if usage.requests_daily >= Config.STRAVA_RATE_LIMIT_DAILY:
+                logger.warning("Strava daily rate limit would be exceeded")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking rate limits: {e}")
+            return True  # Allow request if we can't check limits
+    
+    def _record_request(self):
+        """Record that we made a request"""
+        from models import StravaApiUsage
+        from app import db
+        
+        try:
+            today = datetime.now().date()
+            usage = db.session.query(StravaApiUsage).filter_by(date=today).first()
+            
+            if not usage:
+                usage = StravaApiUsage(date=today)
+                db.session.add(usage)
+            
+            # Reset 15-minute counter if needed
+            if not usage.last_request_time or usage.last_request_time <= datetime.now() - timedelta(minutes=15):
+                usage.requests_15min = 1
+            else:
+                usage.requests_15min += 1
+            
+            usage.requests_daily += 1
+            usage.last_request_time = datetime.now()
+            usage.updated_at = datetime.now()
+            
+            db.session.commit()
+            
+        except Exception as e:
+            logger.error(f"Error recording request: {e}")
 
     def refresh_access_token(self, refresh_token: str) -> Optional[Dict]:
         """Refresh the access token using refresh token"""
@@ -39,8 +104,12 @@ class StravaClient:
             return None
 
     def get_athlete_activities(self, access_token: str, start_date: datetime, end_date: datetime) -> List[Dict]:
-        """Fetch athlete activities for a date range"""
+        """Fetch athlete activities for a date range with rate limiting"""
         try:
+            if not self._check_rate_limits():
+                logger.warning("Skipping activity fetch due to rate limits")
+                return []
+            
             headers = {'Authorization': f'Bearer {access_token}'}
 
             # Convert dates to Unix timestamps
@@ -50,6 +119,10 @@ class StravaClient:
             all_activities = []
             page = 1
             while True:
+                if not self._check_rate_limits():
+                    logger.warning("Rate limit reached during pagination")
+                    break
+                
                 params = {
                     'after': after,
                     'before': before,
@@ -62,6 +135,7 @@ class StravaClient:
                     headers=headers,
                     params=params
                 )
+                self._record_request()
                 response.raise_for_status()
 
                 activities = response.json()

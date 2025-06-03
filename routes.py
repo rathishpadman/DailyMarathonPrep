@@ -1385,11 +1385,27 @@ def api_athlete_performance_charts():
         from models import OptimalValues
         from datetime import timedelta
 
-        # Get last 30 days of data
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=30)
+        # Get filter parameters
+        athlete_id = request.args.get('athlete_id', type=int)
+        timeframe = request.args.get('timeframe', '7days')
 
-        athletes = db.session.query(Athlete).filter_by(is_active=True).all()
+        # Calculate date range based on timeframe
+        end_date = datetime.now()
+        if timeframe == '30days':
+            start_date = end_date - timedelta(days=30)
+            days_range = 30
+        elif timeframe == '90days':
+            start_date = end_date - timedelta(days=90)
+            days_range = 90
+        else:  # 7days default
+            start_date = end_date - timedelta(days=7)
+            days_range = 7
+
+        # Filter athletes based on selection
+        if athlete_id:
+            athletes = db.session.query(Athlete).filter_by(id=athlete_id, is_active=True).all()
+        else:
+            athletes = db.session.query(Athlete).filter_by(is_active=True).all()
 
         chart_data = {
             'distance': {
@@ -1410,10 +1426,10 @@ def api_athlete_performance_charts():
             }
         }
 
-        # Generate date labels for last 7 days
+        # Generate date labels based on timeframe
         dates = []
-        for i in range(7):
-            date = (end_date - timedelta(days=6-i)).date()
+        for i in range(days_range):
+            date = (end_date - timedelta(days=days_range-1-i)).date()
             dates.append(date.strftime('%m/%d'))
 
         chart_data['distance']['labels'] = dates
@@ -1449,14 +1465,14 @@ def api_athlete_performance_charts():
                     daily_data[day]['pace'].append(activity.pace_min_per_km)
                 daily_data[day]['elevation'] += activity.total_elevation_gain or 0
 
-            # Prepare data arrays for last 7 days
+            # Prepare data arrays for the timeframe
             distance_data = []
             hr_data = []
             pace_data = []
             elevation_data = []
 
-            for i in range(7):
-                date = (end_date - timedelta(days=6-i)).date()
+            for i in range(days_range):
+                date = (end_date - timedelta(days=days_range-1-i)).date()
                 if date in daily_data:
                     distance_data.append(daily_data[date]['distance'])
                     hr_data.append(sum(daily_data[date]['heart_rate']) / len(daily_data[date]['heart_rate']) if daily_data[date]['heart_rate'] else 0)
@@ -1496,31 +1512,48 @@ def api_athlete_performance_charts():
                 'backgroundColor': f'hsl({hash(athlete.name) % 360}, 70%, 50%)'
             })
 
-        # Add optimal value lines
+        # Add optimal value lines (create default values if none exist)
         optimal_global = db.session.query(OptimalValues).filter_by(athlete_id=None).first()
+        if not optimal_global:
+            # Create default optimal values
+            optimal_global = OptimalValues(
+                athlete_id=None,
+                optimal_distance_km=10.0,
+                optimal_pace_min_per_km=5.5,
+                optimal_heart_rate_bpm=150,
+                max_heart_rate_bpm=180,
+                optimal_elevation_gain_m=100.0,
+                weekly_distance_target_km=50.0
+            )
+            db.session.add(optimal_global)
+            db.session.commit()
+
         if optimal_global:
             chart_data['distance']['datasets'].append({
-                'label': 'Optimal',
-                'data': [optimal_global.optimal_distance_km] * 7,
-                'borderColor': 'red',
+                'label': 'Target Distance',
+                'data': [optimal_global.optimal_distance_km] * days_range,
+                'borderColor': 'rgba(255, 0, 0, 0.8)',
                 'borderDash': [5, 5],
-                'fill': False
+                'fill': False,
+                'pointRadius': 0
             })
 
             chart_data['heartRate']['datasets'].append({
-                'label': 'Optimal',
-                'data': [optimal_global.optimal_heart_rate_bpm] * 7,
-                'borderColor': 'red',
+                'label': 'Target HR',
+                'data': [optimal_global.optimal_heart_rate_bpm] * days_range,
+                'borderColor': 'rgba(255, 0, 0, 0.8)',
                 'borderDash': [5, 5],
-                'fill': False
+                'fill': False,
+                'pointRadius': 0
             })
 
             chart_data['pace']['datasets'].append({
-                'label': 'Optimal',
-                'data': [optimal_global.optimal_pace_min_per_km] * 7,
-                'borderColor': 'red',
+                'label': 'Target Pace',
+                'data': [optimal_global.optimal_pace_min_per_km] * days_range,
+                'borderColor': 'rgba(255, 0, 0, 0.8)',
                 'borderDash': [5, 5],
-                'fill': False
+                'fill': False,
+                'pointRadius': 0
             })
 
         return jsonify({

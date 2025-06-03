@@ -105,20 +105,26 @@ class SystemLog(db.Model):
 
 class StravaApiUsage(db.Model):
     """Model for tracking Strava API usage"""
+    __tablename__ = 'strava_api_usage'
+
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, nullable=False, unique=True)
-    requests_15min = db.Column(db.Integer, default=0)
-    requests_daily = db.Column(db.Integer, default=0)
+    requests_made = db.Column(db.Integer, default=0)
+    daily_limit = db.Column(db.Integer, default=1000)
     last_sync_time = db.Column(db.DateTime, nullable=True)
-    last_request_time = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<StravaApiUsage {self.date}: {self.requests_made}/{self.daily_limit}>'
 
 
 class OptimalValues(db.Model):
     """Model for storing optimal performance values for athletes"""
+    __tablename__ = 'optimal_values'
+
     id = db.Column(db.Integer, primary_key=True)
-    athlete_id = db.Column(db.Integer, db.ForeignKey('athlete.id'), nullable=True)  # None for global defaults
+    athlete_id = db.Column(db.Integer, db.ForeignKey('athletes.id'), nullable=True)  # None for global defaults
     optimal_distance_km = db.Column(db.Float, default=10.0)
     optimal_pace_min_per_km = db.Column(db.Float, default=5.5)
     optimal_heart_rate_bpm = db.Column(db.Integer, default=150)
@@ -128,5 +134,6 @@ class OptimalValues(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationships
-    athlete = db.relationship('Athlete', backref='optimal_values', lazy=True)
+    def __repr__(self):
+        athlete_info = f'Athlete {self.athlete_id}' if self.athlete_id else 'Global'
+        return f'<OptimalValues {athlete_info}: {self.optimal_distance_km}km @ {self.optimal_pace_min_per_km} min/km>'

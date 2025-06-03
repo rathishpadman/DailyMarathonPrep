@@ -1265,3 +1265,80 @@ function runQuickSync() {
         }
     });
 }
+
+// Summary data filtering functions
+function updateSummaryData(period) {
+    console.log('Updating summary data for period:', period);
+
+    // Update active button state
+    document.querySelectorAll('.period-filter').forEach(btn => {
+        btn.classList.remove('active', 'btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+
+    const activeButton = document.querySelector(`[data-period="${period}"]`);
+    if (activeButton) {
+        activeButton.classList.add('active', 'btn-primary');
+        activeButton.classList.remove('btn-outline-primary');
+    }
+
+    // Show loading state
+    const tableContainer = document.getElementById('summaryTableContainer');
+    if (tableContainer) {
+        tableContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border"></div></div>';
+    }
+
+    // Fetch new data
+    fetch(`/api/training-summary/${period}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateSummaryTable(data.summary_data, period);
+            } else {
+                console.error('API Error:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (tableContainer) {
+                tableContainer.innerHTML = '<div class="alert alert-danger">Error loading data</div>';
+            }
+        });
+}
+
+function updateSummaryPeriod() {
+    const period = document.getElementById('summary_period')?.value || '10days';
+    updateSummaryData(period);
+}
+
+function updateChartsTimeframe() {
+    const timeframe = document.getElementById('chart_timeframe')?.value || '7days';
+    console.log('Updating charts timeframe:', timeframe);
+    // Reload charts with new timeframe
+    updatePerformanceCharts();
+}
+
+function resetAllFilters() {
+    // Reset all filter dropdowns
+    if (document.getElementById('athlete_filter')) {
+        document.getElementById('athlete_filter').value = '';
+    }
+    if (document.getElementById('progress_metric')) {
+        document.getElementById('progress_metric').value = 'mileage';
+    }
+    if (document.getElementById('progress_period')) {
+        document.getElementById('progress_period').value = 'month';
+    }
+    if (document.getElementById('summary_period')) {
+        document.getElementById('summary_period').value = '10days';
+    }
+    if (document.getElementById('chart_timeframe')) {
+        document.getElementById('chart_timeframe').value = '7days';
+    }
+
+    // Reset views
+    filterByAthlete();
+    updateProgressView();
+    updateSummaryData('10days');
+    updatePerformanceCharts();
+}

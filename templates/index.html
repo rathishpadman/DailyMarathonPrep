@@ -88,9 +88,9 @@
                         </h5>
                     </div>
 
-                    <!-- Progress Filters -->
+                    <!-- Progress and Summary Filters -->
                     <div class="row g-2">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label for="athlete_filter" class="form-label">Filter by Athlete</label>
                             <select id="athlete_filter" class="form-select" onchange="filterByAthlete()">
                                 <option value="">All Athletes</option>
@@ -101,7 +101,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label for="progress_metric" class="form-label">Metric</label>
                             <select id="progress_metric" class="form-select" onchange="updateProgressView()">
                                 <option value="mileage">Total Distance (km)</option>
@@ -110,18 +110,34 @@
                                 <option value="elevation">Elevation Gain (m)</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label for="progress_period" class="form-label">Period</label>
                             <select id="progress_period" class="form-select" onchange="updateProgressView()">
                                 <option value="month">Last 30 Days</option>
                                 <option value="total">All Time</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
+                            <label for="summary_period" class="form-label">Summary Period</label>
+                            <select id="summary_period" class="form-select" onchange="updateSummaryPeriod()">
+                                <option value="10days" selected>Last 10 Days</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="chart_timeframe" class="form-label">Charts Period</label>
+                            <select id="chart_timeframe" class="form-select" onchange="updateChartsTimeframe()">
+                                <option value="7days" selected>Last 7 Days</option>
+                                <option value="30days">Last 30 Days</option>
+                                <option value="90days">Last 90 Days</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
                             <label class="form-label">&nbsp;</label>
                             <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetProgressFilters()">
-                                    <i data-feather="refresh-cw" class="me-1"></i>Reset
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetAllFilters()">
+                                    <i data-feather="refresh-cw" class="me-1"></i>Reset All
                                 </button>
                             </div>
                         </div>
@@ -167,19 +183,34 @@
                                         <span class="badge bg-primary">{{ athlete_data.total_actual_km }} km</span>
                                     </td>
                                     <td class="period-data">
-                                        <small>{{ athlete_data.prev_week_actual }} / {{ athlete_data.prev_week_planned }} km</small>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <small><strong>Current:</strong> {{ athlete_data.current_week_actual }}/{{ athlete_data.current_week_planned }} km</small>
+                                            <small><strong>Previous:</strong> {{ athlete_data.prev_week_actual }}/{{ athlete_data.prev_week_planned }} km</small>
+                                        </div>
+                                        <div class="progress mt-1" style="height: 4px;">
+                                            <div class="progress-bar 
+                                                {% if athlete_data.week_change >= 0 %}bg-success{% else %}bg-danger{% endif %}" 
+                                                role="progressbar" 
+                                                style="width: {{ (athlete_data.week_change_percent|abs)|round }}%"
+                                                title="{{ athlete_data.week_change }} km change ({{ athlete_data.week_change_percent }}%)">
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">
+                                            {% if athlete_data.week_change >= 0 %}+{% endif %}{{ athlete_data.week_change }} km 
+                                            ({% if athlete_data.week_change_percent >= 0 %}+{% endif %}{{ athlete_data.week_change_percent }}%)
+                                        </small>
                                     </td>
                                     <td>
                                         <div class="progress" style="height: 20px;">
                                             <div class="progress-bar 
-                                                {% if athlete_data.prev_week_completion_rate >= 80 %}bg-success
-                                                {% elif athlete_data.prev_week_completion_rate >= 60 %}bg-warning
+                                                {% if athlete_data.completion_rate >= 80 %}bg-success
+                                                {% elif athlete_data.completion_rate >= 60 %}bg-warning
                                                 {% else %}bg-danger{% endif %}" 
                                                 role="progressbar" 
-                                                style="width: {{ athlete_data.prev_week_completion_rate }}%"
-                                                aria-valuenow="{{ athlete_data.prev_week_completion_rate }}" 
+                                                style="width: {{ athlete_data.completion_rate }}%"
+                                                aria-valuenow="{{ athlete_data.completion_rate }}" 
                                                 aria-valuemin="0" aria-valuemax="100">
-                                                {{ athlete_data.prev_week_completion_rate }}%
+                                                {{ athlete_data.completion_rate }}%
                                             </div>
                                         </div>
                                     </td>
@@ -211,43 +242,24 @@
         </div>
     </div>
 
-    <!-- Summary Table with Filters -->
+    <!-- Training Summary Table -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i data-feather="bar-chart-2" class="me-2"></i>
-                            Training Summary
-                        </h5>
-                        <div class="btn-group" role="group">
-                            <button type="button" class="btn btn-outline-primary period-filter {% if current_period == 'day' %}active{% endif %}" data-period="day">
-                                Day
-                            </button>
-                            <button type="button" class="btn btn-outline-primary period-filter {% if current_period == 'week' %}active{% endif %}" data-period="week">
-                                Week
-                            </button>
-                            <button type="button" class="btn btn-outline-primary period-filter {% if current_period == 'month' %}active{% endif %}" data-period="month">
-                                Month
-                            </button>
-                        </div>
-                    </div>
+                    <h5 class="card-title mb-0">
+                        <i data-feather="bar-chart-2" class="me-2"></i>
+                        Training Summary (Last 10 Days)
+                    </h5>
                 </div>
                 <div class="card-body">
-                    <div id="summaryTableContainer">
-                        {% if summary_data %}
-                        <div class="table-responsive">
-                            <div id="loadingIndicator" class="text-center py-3" style="display: none;">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                            </div>
-                            <table class="table table-hover" id="summaryTable">
+                    {% if summary_data %}
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="summaryTable">
                             <thead>
                                 <tr>
-                                    <th>Period</th>
-                                    <th>Athletes</th>
+                                    <th>Date</th>
+                                    <th>Athlete</th>
                                     <th>Planned (km)</th>
                                     <th>Actual (km)</th>
                                     <th>Completion Rate</th>
@@ -255,45 +267,39 @@
                                 </tr>
                             </thead>
                             <tbody id="summaryTableBody">
-                                {% for day_data in summary_data %}
-                                <tr>
-                                    <td>{{ day_data.period_label if day_data.period_label else day_data.date.strftime('%Y-%m-%d') }}</td>
+                                {% for summary_row in summary_data %}
+                                <tr data-athlete-id="{{ summary_row.athlete_id }}">
+                                    <td>{{ summary_row.period_label }}</td>
                                     <td>
-                                            {% if day_data.athletes %}
-                                                {% for athlete in day_data.athletes[:3] %}
-                                                    <span class="badge bg-light text-dark me-1">{{ athlete.name }}</span>
-                                                {% endfor %}
-                                                {% if day_data.athletes|length > 3 %}
-                                                    <span class="badge bg-secondary">+{{ day_data.athletes|length - 3 }} more</span>
-                                                {% endif %}
-                                            {% else %}
-                                                <span class="text-muted">No athletes</span>
-                                            {% endif %}
-                                        </td>
-                                    <td>{{ "%.1f"|format(day_data.total_planned) }}</td>
-                                    <td>{{ "%.1f"|format(day_data.total_actual) }}</td>
-                                    <td>{{ "%.1f"|format(day_data.completion_rate) }}%</td>
+                                        <strong>{{ summary_row.athlete_name }}</strong>
+                                    </td>
+                                    <td>{{ "%.1f"|format(summary_row.planned_distance) }}</td>
+                                    <td>{{ "%.1f"|format(summary_row.actual_distance) }}</td>
+                                    <td>{{ "%.1f"|format(summary_row.completion_rate) }}%</td>
                                     <td>
-                                        {% if day_data.completion_rate >= 80 %}
-                                            <span class="badge bg-success">Excellent</span>
-                                        {% elif day_data.completion_rate >= 60 %}
-                                            <span class="badge bg-warning">Good</span>
+                                        {% if summary_row.status == 'On Track' %}
+                                            <span class="badge bg-success">{{ summary_row.status }}</span>
+                                        {% elif summary_row.status == 'Over-performed' %}
+                                            <span class="badge bg-info">{{ summary_row.status }}</span>
+                                        {% elif summary_row.status == 'Under-performed' %}
+                                            <span class="badge bg-warning">{{ summary_row.status }}</span>
+                                        {% elif summary_row.status == 'Missed Workout' %}
+                                            <span class="badge bg-danger">{{ summary_row.status }}</span>
                                         {% else %}
-                                            <span class="badge bg-danger">Needs Improvement</span>
+                                            <span class="badge bg-secondary">{{ summary_row.status }}</span>
                                         {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
-                        </div>
-                        {% else %}
-                        <div class="text-center py-4">
-                            <i data-feather="inbox" style="width: 3rem; height: 3rem;" class="text-muted mb-3"></i>
-                            <p class="text-muted">No training data available for the selected period.</p>
-                        </div>
-                        {% endif %}
                     </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i data-feather="inbox" style="width: 3rem; height: 3rem;" class="text-muted mb-3"></i>
+                        <p class="text-muted">No training data available.</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

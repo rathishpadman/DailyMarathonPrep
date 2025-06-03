@@ -74,115 +74,17 @@ function setupEventListeners() {
     }
 }
 
-/**
- * Update summary data via AJAX
- */
-function updateSummaryData(period) {
-    // Show loading state
-    const summaryTableContainer = document.getElementById('summaryTableContainer');
-    if (summaryTableContainer) {
-        summaryTableContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
-    }
-
-    // Update active button state
-    const periodButtons = document.querySelectorAll('.period-filter');
-    periodButtons.forEach(btn => {
-        btn.classList.remove('active');
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-outline-primary');
-    });
-
-    const activeButton = document.querySelector(`[data-period="${period}"]`);
-    if (activeButton) {
-        activeButton.classList.add('active');
-        activeButton.classList.remove('btn-outline-primary');
-        activeButton.classList.add('btn-primary');
-    }
-
-    // Fetch updated summary data
-    fetch(`/api/summary-stats/${period}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                throw new Error(data.error);
-            }
-
-            // Update summary table
-            updateSummaryTable(data.summary_data, period);
-
-            // Update stats if elements exist
-            updateSummaryStats(data);
-        })
-        .catch(error => {
-            console.error('Error fetching summary data:', error);
-            if (summaryTableContainer) {
-                summaryTableContainer.innerHTML = `<div class="alert alert-danger">Error loading data: ${error.message}</div>`;
-            }
-        });
-}
-
-/**
- * Update summary table with new data
- */
-function updateSummaryTable(summaryData, period) {
-    const tableContainer = document.getElementById('summaryTableContainer');
-    if (!tableContainer) return;
-
-    if (!summaryData || summaryData.length === 0) {
-        tableContainer.innerHTML = '<div class="text-center p-4"><p class="text-muted">No data available for the selected period.</p></div>';
-        return;
-    }
-
-    let tableHtml = `
-        <div class="table-responsive">
-            <div id="loadingIndicator" class="text-center py-3" style="display: none;">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-            <table class="table table-hover" id="summaryTable">
-                <thead>
-                    <tr>
-                        <th>Period</th>
-                        <th>Athletes</th>
-                        <th>Planned (km)</th>
-                        <th>Actual (km)</th>
-                        <th>Completion Rate</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="summaryTableBody">
-    `;
-
-    summaryData.forEach(item => {
-        let statusBadge = '';
-        if (item.completion_rate >= 80) {
-            statusBadge = '<span class="badge bg-success">Excellent</span>';
-        } else if (item.completion_rate >= 60) {
-            statusBadge = '<span class="badge bg-warning">Good</span>';
+// Individual athlete summary filtering (replaces old summary data functions)
+function filterSummaryByAthlete(athleteId) {
+    const summaryRows = document.querySelectorAll('#summaryTableBody tr');
+    summaryRows.forEach(row => {
+        const rowAthleteId = row.getAttribute('data-athlete-id');
+        if (!athleteId || rowAthleteId === athleteId) {
+            row.style.display = '';
         } else {
-            statusBadge = '<span class="badge bg-danger">Needs Improvement</span>';
+            row.style.display = 'none';
         }
-
-        tableHtml += `
-            <tr>
-                <td>${item.period_label || new Date(item.date).toLocaleDateString()}</td>
-                <td>${item.athletes ? item.athletes.length : 0}</td>
-                <td>${item.total_planned.toFixed(1)}</td>
-                <td>${item.total_actual.toFixed(1)}</td>
-                <td>${item.completion_rate.toFixed(1)}%</td>
-                <td>${statusBadge}</td>
-            </tr>
-        `;
     });
-
-    tableHtml += '</tbody></table></div>';
-    tableContainer.innerHTML = tableHtml;
 }
 
 /**

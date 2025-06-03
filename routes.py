@@ -317,7 +317,9 @@ def get_filtered_summary_data(period='week'):
 
             # Convert athlete_data to athletes list and get latest 10 dates
             for date_key in date_groups:
-                date_groups[date_key]['athletes'] = list(date_groups[date_key]['athlete_data'].values())
+                athletes_list = list(date_groups[date_key]['athlete_data'].values())
+                date_groups[date_key]['athletes'] = athletes_list
+                date_groups[date_key]['athlete_names'] = [a['name'] for a in athletes_list]
                 date_groups[date_key].pop('athlete_data', None)
 
             sorted_dates = sorted(date_groups.keys(), reverse=True)[:10]
@@ -698,9 +700,7 @@ def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter=
             }
             enhanced_summaries.append(summary_data)
             total_planned += summary.planned_distance_km or 0
-            total_actual += summary.actual_distance_km or 0
-
-        # Calculate aggregate statistics
+            total_actual += summary.actual_distance_km or 0        # Calculate aggregate statistics
         variance = ((total_actual - total_planned) / total_planned * 100) if total_planned > 0 else 0
         completion_rate = len([s for s in enhanced_summaries if s['status'] in ['On Track', 'Over-performed']]) / len(enhanced_summaries) * 100 if enhanced_summaries else 0
 
@@ -953,7 +953,7 @@ def api_athlete_progress_data():
 
             # Generate some variance in data if no real data exists
             athlete_seed = hash(athlete.name) % 1000
-            
+
             progress_data.append({
                 'id': athlete.id,
                 'name': athlete.name,
@@ -1511,14 +1511,14 @@ def api_optimal_values():
     try:
         if request.method == 'GET':
             athlete_id = request.args.get('athlete_id', type=int)
-            
+
             from models import OptimalValues
             optimal = db.session.query(OptimalValues).filter_by(athlete_id=athlete_id).first()
-            
+
             if not optimal:
                 # Return default values
                 optimal = OptimalValues()
-            
+
             return jsonify({
                 'success': True,
                 'values': {
@@ -1530,18 +1530,18 @@ def api_optimal_values():
                     'weekly_distance_target_km': optimal.weekly_distance_target_km
                 }
             })
-        
+
         else:  # POST
             data = request.get_json()
             athlete_id = data.get('athlete_id')
-            
+
             from models import OptimalValues
             optimal = db.session.query(OptimalValues).filter_by(athlete_id=athlete_id).first()
-            
+
             if not optimal:
                 optimal = OptimalValues(athlete_id=athlete_id)
                 db.session.add(optimal)
-            
+
             optimal.optimal_distance_km = data.get('optimal_distance_km', 10.0)
             optimal.optimal_pace_min_per_km = data.get('optimal_pace_min_per_km', 5.5)
             optimal.optimal_heart_rate_bpm = data.get('optimal_heart_rate_bpm', 150)
@@ -1549,11 +1549,11 @@ def api_optimal_values():
             optimal.optimal_elevation_gain_m = data.get('optimal_elevation_gain_m', 100.0)
             optimal.weekly_distance_target_km = data.get('weekly_distance_target_km', 50.0)
             optimal.updated_at = datetime.now()
-            
+
             db.session.commit()
-            
+
             return jsonify({'success': True, 'message': 'Configuration saved successfully'})
-    
+
     except Exception as e:
         logger.error(f"Error handling optimal values: {e}")
         db.session.rollback()
@@ -1565,21 +1565,21 @@ def api_apply_global_defaults():
     """Apply global optimal values to all existing athletes"""
     try:
         from models import OptimalValues
-        
+
         # Get global defaults (athlete_id = None)
         global_defaults = db.session.query(OptimalValues).filter_by(athlete_id=None).first()
-        
+
         if not global_defaults:
             return jsonify({'success': False, 'message': 'No global defaults found'})
-        
+
         # Get all active athletes
         athletes = db.session.query(Athlete).filter_by(is_active=True).all()
         updated_count = 0
-        
+
         for athlete in athletes:
             # Check if athlete already has optimal values
             existing_optimal = db.session.query(OptimalValues).filter_by(athlete_id=athlete.id).first()
-            
+
             if not existing_optimal:
                 # Create new optimal values based on global defaults
                 athlete_optimal = OptimalValues(
@@ -1594,14 +1594,14 @@ def api_apply_global_defaults():
                 )
                 db.session.add(athlete_optimal)
                 updated_count += 1
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True, 
             'message': f'Applied global defaults to {updated_count} athletes'
         })
-        
+
     except Exception as e:
         logger.error(f"Error applying global defaults: {e}")
         db.session.rollback()
@@ -1613,13 +1613,13 @@ def api_athlete_performance_charts():
     try:
         from models import OptimalValues
         from datetime import timedelta
-        
+
         # Get last 30 days of data
         end_date = datetime.now()
         start_date = end_date - timedelta(days=30)
-        
+
         athletes = db.session.query(Athlete).filter_by(is_active=True).all()
-        
+
         chart_data = {
             'distance': {
                 'labels': [],
@@ -1638,18 +1638,18 @@ def api_athlete_performance_charts():
                 'datasets': []
             }
         }
-        
+
         # Generate date labels for last 7 days
         dates = []
         for i in range(7):
             date = (end_date - timedelta(days=6-i)).date()
             dates.append(date.strftime('%m/%d'))
-        
+
         chart_data['distance']['labels'] = dates
         chart_data['heartRate']['labels'] = dates
         chart_data['pace']['labels'] = dates
         chart_data['elevation']['labels'] = dates
-        
+
         for athlete in athletes:
             # Get optimal values for athlete
             optimal = db.session.query(OptimalValues).filter_by(athlete_id=athlete.id).first()
@@ -1657,33 +1657,33 @@ def api_athlete_performance_charts():
                 optimal = db.session.query(OptimalValues).filter_by(athlete_id=None).first()
             if not optimal:
                 continue
-            
+
             # Get recent activities
             activities = db.session.query(Activity).filter(
                 Activity.athlete_id == athlete.id,
                 Activity.start_date >= start_date
             ).order_by(Activity.start_date).all()
-            
+
             # Group by day and calculate averages
             daily_data = {}
             for activity in activities:
                 day = activity.start_date.date()
                 if day not in daily_data:
                     daily_data[day] = {'distance': 0, 'heart_rate': [], 'pace': [], 'elevation': 0}
-                
+
                 daily_data[day]['distance'] += activity.distance_km or 0
                 if activity.average_heartrate:
                     daily_data[day]['heart_rate'].append(activity.average_heartrate)
                 if activity.pace_min_per_km:
                     daily_data[day]['pace'].append(activity.pace_min_per_km)
                 daily_data[day]['elevation'] += activity.total_elevation_gain or 0
-            
+
             # Prepare data arrays for last 7 days
             distance_data = []
             hr_data = []
             pace_data = []
             elevation_data = []
-            
+
             for i in range(7):
                 date = (end_date - timedelta(days=6-i)).date()
                 if date in daily_data:
@@ -1696,7 +1696,7 @@ def api_athlete_performance_charts():
                     hr_data.append(0)
                     pace_data.append(0)
                     elevation_data.append(0)
-            
+
             # Add athlete data
             chart_data['distance']['datasets'].append({
                 'label': athlete.name,
@@ -1704,27 +1704,27 @@ def api_athlete_performance_charts():
                 'borderColor': f'hsl({hash(athlete.name) % 360}, 70%, 50%)',
                 'fill': False
             })
-            
+
             chart_data['heartRate']['datasets'].append({
                 'label': athlete.name,
                 'data': hr_data,
                 'borderColor': f'hsl({hash(athlete.name) % 360}, 70%, 50%)',
                 'fill': False
             })
-            
+
             chart_data['pace']['datasets'].append({
                 'label': athlete.name,
                 'data': pace_data,
                 'borderColor': f'hsl({hash(athlete.name) % 360}, 70%, 50%)',
                 'fill': False
             })
-            
+
             chart_data['elevation']['datasets'].append({
                 'label': athlete.name,
                 'data': elevation_data,
                 'backgroundColor': f'hsl({hash(athlete.name) % 360}, 70%, 50%)'
             })
-        
+
         # Add optimal value lines
         optimal_global = db.session.query(OptimalValues).filter_by(athlete_id=None).first()
         if optimal_global:
@@ -1735,7 +1735,7 @@ def api_athlete_performance_charts():
                 'borderDash': [5, 5],
                 'fill': False
             })
-            
+
             chart_data['heartRate']['datasets'].append({
                 'label': 'Optimal',
                 'data': [optimal_global.optimal_heart_rate_bpm] * 7,
@@ -1743,7 +1743,7 @@ def api_athlete_performance_charts():
                 'borderDash': [5, 5],
                 'fill': False
             })
-            
+
             chart_data['pace']['datasets'].append({
                 'label': 'Optimal',
                 'data': [optimal_global.optimal_pace_min_per_km] * 7,
@@ -1751,12 +1751,12 @@ def api_athlete_performance_charts():
                 'borderDash': [5, 5],
                 'fill': False
             })
-        
+
         return jsonify({
             'success': True,
             **chart_data
         })
-    
+
     except Exception as e:
         logger.error(f"Error getting performance chart data: {e}")
         return jsonify({'success': False, 'message': str(e)})

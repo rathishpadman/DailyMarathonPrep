@@ -55,6 +55,25 @@ canvas {
     max-height: 300px !important;
 }
 
+/* Clickable athlete names */
+.clickable-athlete {
+    transition: all 0.2s ease;
+}
+
+.clickable-athlete:hover {
+    background-color: #0d6efd !important;
+    transform: scale(1.05);
+}
+
+/* Athlete names list styling */
+.athlete-names-list {
+    max-width: 200px;
+}
+
+.athlete-names-list .badge {
+    font-size: 0.75rem;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .display-4, .display-5 {

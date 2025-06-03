@@ -814,6 +814,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Athlete Progress Filtering Functions
 let athleteProgressData = [];
+let filteredData = [];
 
 function initializeProgressFilters() {
     // Load initial athlete progress data with additional metrics
@@ -821,62 +822,137 @@ function initializeProgressFilters() {
     initializePerformanceCharts();
 }
 
-async function loadAthleteProgressData() {
-    try {
-        const response = await fetch('/api/athlete-progress-data');
-        const data = await response.json();
-        
-        if (data.success) {
-            athleteProgressData = data.athletes;
-            updateProgressTableWithData(data.athletes);
-        } else {
-            console.error('Failed to load athlete progress data:', data.message);
-            // Generate unique realistic data for each athlete
-            const existingRows = document.querySelectorAll('#progress_tbody tr');
-            athleteProgressData = [];
-            existingRows.forEach((row, index) => {
-                const athleteId = row.getAttribute('data-athlete-id');
-                const athleteName = row.querySelector('strong').textContent;
-                
-                // Generate unique data for each athlete based on their ID
-                const seed = parseInt(athleteId) || (index + 1);
-                const athleteData = {
-                    id: athleteId,
-                    name: athleteName,
-                    avg_pace: (4.0 + (seed % 4) * 0.5 + Math.random() * 0.5).toFixed(1),
-                    total_elevation: Math.floor(300 + (seed % 5) * 100 + Math.random() * 200),
-                    avg_heart_rate: Math.floor(145 + (seed % 6) * 5 + Math.random() * 15),
-                    activity_count: Math.floor(15 + (seed % 8) * 3 + Math.random() * 10)
-                };
-                athleteProgressData.push(athleteData);
-                
-                const metricCell = row.querySelector('.metric-value');
-                if (metricCell) {
-                    metricCell.setAttribute('data-pace', athleteData.avg_pace);
-                    metricCell.setAttribute('data-elevation', athleteData.total_elevation);
-                    metricCell.setAttribute('data-heart_rate', athleteData.avg_heart_rate);
-                    metricCell.setAttribute('data-mileage', (athleteData.activity_count * 8.5).toFixed(1));
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error loading athlete progress data:', error);
+function loadAthleteProgressData() {
+    fetch('/api/athlete-progress-data')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                athleteProgressData = data.athletes;
+                filteredData = [...athleteProgressData];
+                updateProgressTable();
+                populateAthleteFilter(data.athletes);
+            } else {
+                console.error('Error loading athlete progress data:', data.message);
+                showNotification('Error loading athlete progress data: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching athlete progress data:', error);
+            showNotification('Failed to load athlete progress data', 'error');
+        });
+}
+
+// Remove the old populateProgressTable function since we're using updateProgressTable
+
+// Global variables for athlete data
+
+// Update progress view based on filters
+function updateProgressView() {
+    const athleteFilter = document.getElementById('progressAthleteFilter')?.value || 'all';
+    const metricFilter = document.getElementById('metricFilter')?.value || 'distance';
+
+    // Filter data
+    if (athleteFilter === 'all') {
+        filteredData = [...athleteProgressData];
+    } else {
+        filteredData = athleteProgressData.filter(athlete => athlete.id.toString() === athleteFilter);
+    }
+
+    // Update table and chart
+    updateProgressTable();
+    updateProgressChart(metricFilter);
+}
+
+// Filter progress table by athlete
+function filterByAthlete(athleteId) {
+    const filter = document.getElementById('progressAthleteFilter');
+    if (filter) {
+        filter.value = athleteId;
+        updateProgressView();
     }
 }
 
-function updateProgressTableWithData(athletes) {
-    athletes.forEach(athlete => {
-        const row = document.querySelector(`tr[data-athlete-id="${athlete.id}"]`);
-        if (row) {
-            const metricCell = row.querySelector('.metric-value');
-            if (metricCell) {
-                metricCell.setAttribute('data-pace', athlete.avg_pace || '5.2');
-                metricCell.setAttribute('data-elevation', athlete.total_elevation || '450');
-                metricCell.setAttribute('data-heart_rate', athlete.avg_heart_rate || '165');
-                metricCell.setAttribute('data-mileage', (athlete.activity_count * 8.5 || 85).toFixed(1));
-            }
+// Update metric display
+function updateMetricDisplay() {
+    const metric = document.getElementById('metricFilter')?.value || 'distance';
+    updateProgressChart(metric);
+}
+
+// Sort progress table
+function sortProgressTable(column) {
+    filteredData.sort((a, b) => {
+        let aValue, bValue;
+
+        switch(column) {
+            case 'distance':
+                aValue = a.total_distance;
+                bValue = b.total_distance;
+                break;
+            case 'pace':
+                aValue = a.avg_pace;
+                bValue = b.avg_pace;
+                break;
+            case 'heart_rate':
+                aValue = a.avg_heart_rate;
+                bValue = b.avg_heart_rate;
+                break;
+            case 'elevation':
+                aValue = a.total_elevation;
+                bValue = b.total_elevation;
+                break;
+            case 'current_week':
+                aValue = a.current_week_distance;
+                bValue = b.current_week_distance;
+                break;
+            case 'prev_week':
+                aValue = a.prev_week_distance;
+                bValue = b.prev_week_distance;
+                break;
+            default:
+                aValue = 0;
+                bValue = 0;
         }
+
+        return bValue - aValue; // Descending order
     });
+
+    updateProgressTable();
+}
+
+// Update progress table with filtered and sorted data
+function updateProgressTable() {
+    const tbody = document.querySelector('#progressTable tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    filteredData.forEach(athlete => {
+        const row = document.createElement('tr');
+        row.dataset.athleteId = athlete.id;
+
+        row.innerHTML = `
+            <td><strong>${athlete.name}</strong></td>
+            <td data-column="distance">${athlete.total_distance} km</td>
+            <td data-column="pace">${athlete.avg_pace > 0 ? athlete.avg_pace + ' min/km' : 'N/A'}</td>
+            <td data-column="heart_rate">${athlete.avg_heart_rate > 0 ? athlete.avg_heart_rate + ' bpm' : 'N/A'}</td>
+            <td data-column="elevation">${athlete.total_elevation} m</td>
+            <td data-column="current_week">${athlete.current_week_distance} km</td>
+            <td data-column="prev_week">${athlete.prev_week_distance} km</td>
+            <td data-column="comparison">
+                <span class="${athlete.week_comparison >= 0 ? 'text-success' : 'text-danger'}">
+                    ${athlete.week_comparison >= 0 ? '+' : ''}${athlete.week_comparison} km
+                </span>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+    });
+}
+
+// Update progress chart based on metric
+function updateProgressChart(metric) {
+    // This will be implemented when chart functionality is added
+    console.log('Updating progress chart for metric:', metric);
 }
 
 function updateProgressView() {
@@ -981,7 +1057,7 @@ function sortProgressTable(metric, sortOrder) {
 function filterByAthlete() {
     const selectedAthleteId = document.getElementById('athlete_filter').value;
     const rows = document.querySelectorAll('#progress_tbody tr');
-    
+
     rows.forEach(row => {
         const athleteId = row.getAttribute('data-athlete-id');
         if (!selectedAthleteId || athleteId === selectedAthleteId) {
@@ -998,6 +1074,30 @@ function resetProgressFilters() {
     document.getElementById('progress_period').value = 'month';
     filterByAthlete();
     updateProgressView();
+}
+
+// Initialize charts for athlete selection
+function updateChartsForAthlete(athleteId) {
+    console.log('Updating charts for athlete:', athleteId);
+    // This will be implemented when chart data is properly loaded
+}
+
+// Filter athlete progress from training summary clicks
+function filterAthleteProgress(athleteId) {
+    // Scroll to athlete progress section
+    const progressSection = document.querySelector('#athlete-progress-section');
+    if (progressSection) {
+        progressSection.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Set the filter and update view
+    setTimeout(() => {
+        const progressFilter = document.getElementById('progressAthleteFilter');
+        if (progressFilter) {
+            progressFilter.value = athleteId;
+            updateProgressView();
+        }
+    }, 500);
 }
 
 // Performance Charts Functions
@@ -1047,7 +1147,7 @@ function createPerformanceCharts() {
     Object.keys(chartConfigs).forEach(chartType => {
         const config = chartConfigs[chartType];
         const ctx = document.getElementById(config.canvas);
-        
+
         if (ctx) {
             window.charts[chartType] = new Chart(ctx, {
                 type: chartType === 'elevation' ? 'bar' : 'line',

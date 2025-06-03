@@ -107,9 +107,11 @@ class StravaApiUsage(db.Model):
     """Model for tracking Strava API usage"""
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, nullable=False, unique=True)
-    requests_made = db.Column(db.Integer, default=0)
+    requests_15min = db.Column(db.Integer, default=0)
+    requests_daily = db.Column(db.Integer, default=0)
     limit_reached = db.Column(db.Boolean, default=False)
     last_sync_time = db.Column(db.DateTime, nullable=True)
+    last_request_time = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

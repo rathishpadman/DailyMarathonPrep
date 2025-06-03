@@ -197,48 +197,57 @@
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
-                        <i data-feather="clock" class="me-2"></i>
-                        Recent Planned Workouts (Last 7 Days)
+                        <i data-feather="edit-3" class="me-2"></i>
+                        Training Plan Editor
                     </h5>
                 </div>
                 <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <button type="button" class="btn btn-success btn-sm" onclick="addNewRow()">
+                                <i data-feather="plus" class="me-1"></i>
+                                Add Row
+                            </button>
+                            <button type="button" class="btn btn-info btn-sm" onclick="duplicateAthlete()">
+                                <i data-feather="copy" class="me-1"></i>
+                                Duplicate Athlete
+                            </button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="saveTrainingPlan()">
+                                <i data-feather="save" class="me-1"></i>
+                                Save Changes
+                            </button>
+                        </div>
+                        <div>
+                            <select id="athlete_selector" class="form-select form-select-sm" style="width: auto;">
+                                <option value="">Select athlete to filter...</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
+                        <table id="training_plan_table" class="table table-sm table-bordered">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Athlete</th>
-                                    <th>Distance</th>
-                                    <th>Target Pace</th>
-                                    <th>Workout Type</th>
+                                    <th style="width: 120px;">Date</th>
+                                    <th style="width: 150px;">Athlete</th>
+                                    <th style="width: 100px;">Distance (km)</th>
+                                    <th style="width: 120px;">Pace (min/km)</th>
+                                    <th style="width: 120px;">Workout Type</th>
                                     <th>Notes</th>
+                                    <th style="width: 80px;">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {% for workout in recent_workouts %}
-                                <tr>
-                                    <td>{{ workout.workout_date.strftime('%Y-%m-%d') }}</td>
-                                    <td><strong>{{ workout.athlete.name }}</strong></td>
-                                    <td>{{ "%.1f"|format(workout.planned_distance_km) }} km</td>
-                                    <td>
-                                        {% set pace_min = workout.planned_pace_min_per_km|int %}
-                                        {% set pace_sec = ((workout.planned_pace_min_per_km - pace_min) * 60)|int %}
-                                        {{ "%d:%02d"|format(pace_min, pace_sec) }} /km
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-outline-primary">{{ workout.workout_type or 'Regular Run' }}</span>
-                                    </td>
-                                    <td>
-                                        {% if workout.notes %}
-                                            <small class="text-muted">{{ workout.notes[:100] }}{% if workout.notes|length > 100 %}...{% endif %}</small>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
+                            <tbody id="training_plan_tbody">
+                                <!-- Rows will be loaded dynamically -->
                             </tbody>
                         </table>
+                    </div>
+
+                    <div id="training_plan_loading" class="text-center py-3" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Loading training plan data...</p>
                     </div>
                 </div>
             </div>

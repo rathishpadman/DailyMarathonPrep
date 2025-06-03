@@ -173,12 +173,10 @@
                                 <tr>
                                     <th>Date</th>
                                     <th>Athlete</th>
-                                    <th>Status</th>
                                     <th>Planned Distance</th>
                                     <th>Actual Distance</th>
                                     <th>Distance Variance</th>
-                                    <th>Planned Pace</th>
-                                    <th>Actual Pace</th>
+                                    <th>Status</th>
                                     <th>Notes</th>
                                 </tr>
                             </thead>
@@ -187,6 +185,17 @@
                                 <tr>
                                     <td>{{ summary.date.strftime('%Y-%m-%d') }}</td>
                                     <td>{{ summary.athlete_name }}</td>
+                                    <td>{{ "%.1f"|format(summary.planned_distance) }} km</td>
+                                    <td>{{ "%.1f"|format(summary.actual_distance) }} km</td>
+                                    <td>
+                                        {% if summary.distance_variance > 0 %}
+                                            <span class="text-success">+{{ "%.1f"|format(summary.distance_variance) }}%</span>
+                                        {% elif summary.distance_variance < 0 %}
+                                            <span class="text-danger">{{ "%.1f"|format(summary.distance_variance) }}%</span>
+                                        {% else %}
+                                            <span class="text-muted">0%</span>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if summary.status == 'On Track' %}
                                             <span class="badge bg-success">{{ summary.status }}</span>
@@ -200,16 +209,7 @@
                                             <span class="badge bg-secondary">{{ summary.status }}</span>
                                         {% endif %}
                                     </td>
-                                    <td>{{ "%.1f"|format(summary.planned_distance) }} km</td>
-                                    <td>{{ "%.1f"|format(summary.actual_distance) }} km</td>
-                                    <td>
-                                        <span class="{% if summary.distance_variance >= 0 %}text-success{% else %}text-danger{% endif %}">
-                                            {{ "%+.1f"|format(summary.distance_variance) }}%
-                                        </span>
-                                    </td>
-                                    <td>{{ "%.2f"|format(summary.planned_pace) if summary.planned_pace else 'N/A' }}</td>
-                                    <td>{{ "%.2f"|format(summary.actual_pace) if summary.actual_pace else 'N/A' }}</td>
-                                    <td><small>{{ summary.notes or 'No notes' }}</small></td>
+                                    <td>{{ summary.notes or '-' }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -314,7 +314,7 @@ function exportToCSV() {
         const cols = row.querySelectorAll('td, th');
         const csvRow = [];
 
-        for (let j = 0; j < cols.length - 1; j++) { // Exclude actions column
+        for (let j = 0; j < cols.length; j++) {
             csvRow.push('"' + cols[j].textContent.trim() + '"');
         }
         csv.push(csvRow.join(','));

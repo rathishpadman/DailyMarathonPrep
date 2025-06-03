@@ -344,3 +344,59 @@
     });
 </script>
 {% endblock %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i data-feather="trophy" class="me-2"></i>
+                Athlete Progress
+            </h2>
+            <a href="{{ url_for('strava_auth') }}" class="btn btn-primary">
+                <i data-feather="plus" class="me-2"></i>
+                Connect New Athlete
+            </a>
+        </div>
+
+        <!-- Filter Options -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="filter" class="me-2"></i>
+                    Progress Filters
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="metric_filter" class="form-label">Metric</label>
+                        <select id="metric_filter" class="form-select" onchange="updateProgressView()">
+                            <option value="mileage">Total Mileage</option>
+                            <option value="heart_rate">Average Heart Rate</option>
+                            <option value="elevation">Total Elevation</option>
+                            <option value="pace">Average Pace</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="period_filter" class="form-label">Period</label>
+                        <select id="period_filter" class="form-select" onchange="updateProgressView()">
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                            <option value="all_time">All Time</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="sort_filter" class="form-label">Sort By</label>
+                        <select id="sort_filter" class="form-select" onchange="updateProgressView()">
+                            <option value="performance">Performance</option>
+                            <option value="name">Name</option>
+                            <option value="recent_activity">Recent Activity</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-secondary d-block" onclick="resetFilters()">
+                            <i data-feather="refresh-ccw" class="me-1"></i>
+                            Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>

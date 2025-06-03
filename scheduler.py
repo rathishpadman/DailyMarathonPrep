@@ -422,17 +422,18 @@ class DailyTaskScheduler:
             # Default: sync only last 2 days (today and yesterday)
             end_date = datetime.now()
             start_date = end_date - timedelta(days=1)  # Only yesterday and today
+            logger.info(f"Manual execution for last 2 days: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
             return self.execute_date_range_sync(start_date, end_date)
         else:
-            # Check if target date is within last 2 days
+            # For specific date, only allow if within last 2 days
             current_date = datetime.now().date()
             target_date_only = target_date.date() if isinstance(target_date, datetime) else target_date
             
             if target_date_only < current_date - timedelta(days=2):
-                logger.warning(f"Target date {target_date_only} is beyond 2-day limit")
+                logger.warning(f"Target date {target_date_only} is beyond 2-day limit. Only last 2 days allowed.")
                 return False
             
-            logger.info(f"Manual execution for {target_date.strftime('%Y-%m-%d')}")
+            logger.info(f"Manual execution for specific date: {target_date.strftime('%Y-%m-%d')}")
             return self.execute_daily_tasks(target_date)
 
     def execute_date_range_sync(self, start_date: datetime, end_date: datetime) -> bool:

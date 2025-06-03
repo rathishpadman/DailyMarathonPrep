@@ -196,8 +196,10 @@ class DataProcessor:
                 summary_date=summary_date
             ).first()
 
+            current_timestamp = datetime.now()
+
             if existing_summary:
-                # Update existing summary - FIX: Update all fields explicitly
+                # Update existing summary - FIX: Update all fields explicitly including today's data
                 existing_summary.actual_distance_km = performance_summary.get('actual_distance_km', 0)
                 existing_summary.planned_distance_km = performance_summary.get('planned_distance_km', 0)
                 existing_summary.actual_pace_min_per_km = performance_summary.get('actual_pace_min_per_km', 0)
@@ -206,7 +208,10 @@ class DataProcessor:
                 existing_summary.pace_variance_percent = performance_summary.get('pace_variance_percent', 0)
                 existing_summary.status = performance_summary.get('status', 'Unknown')
                 existing_summary.notes = f"Activities: {', '.join(performance_summary.get('activity_names', []))}"
-                existing_summary.updated_at = datetime.now()  # Add timestamp if column exists
+                
+                # Always update with current data, including today's activities
+                if hasattr(existing_summary, 'updated_at'):
+                    existing_summary.updated_at = current_timestamp
 
                 logger.info(f"Updated existing daily summary for athlete {athlete_id} on {summary_date}")
             else:
@@ -230,7 +235,7 @@ class DataProcessor:
             db.session.flush()
             db.session.commit()
 
-            logger.info(f"Successfully saved daily summary for athlete {athlete_id}")
+            logger.info(f"Successfully saved daily summary for athlete {athlete_id} - includes today's data")
             return True
 
         except Exception as e:

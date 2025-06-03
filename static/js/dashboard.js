@@ -792,33 +792,45 @@ window.DashboardApp = {
     createStatusBreakdownChart
 };
 
-function runManualSync() {
-    if (confirm('Run manual sync for today?')) {
-        fetch('/api/manual-run', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({})
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                showAlert('Manual sync completed successfully', 'success');
-                // Refresh the page after a short delay
-                setTimeout(() => location.reload(), 2000);
-            } else {
-                showAlert('Manual sync failed: ' + data.message, 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error running manual sync:', error);
-            showAlert('Error running manual sync: ' + error.message, 'error');
-        });
-    }
+/**
+ * Quick sync for last 2 days only
+ */
+function runQuickSync() {
+    const button = document.querySelector('button[onclick="runQuickSync()"]');
+    if (!button) return;
+
+    const originalText = button.innerHTML;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Syncing...';
+    button.disabled = true;
+
+    fetch('/api/sync-current', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', data.message);
+            // Refresh the page after successful sync
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            showAlert('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Sync error:', error);
+        showAlert('error', 'An error occurred during sync');
+    })
+    .finally(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        // Re-initialize feather icons
+        if (window.feather) {
+            feather.replace();
+        }
+    });
 }

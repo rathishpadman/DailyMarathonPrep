@@ -702,7 +702,6 @@ def get_enhanced_dashboard_data(target_date, athlete_filter=None, period_filter=
 
         # Calculate aggregate statistics
         variance = ((total_actual - total_planned) / total_planned * 100) if total_planned > 0 else 0
-```python
         completion_rate = len([s for s in enhanced_summaries if s['status'] in ['On Track', 'Over-performed']]) / len(enhanced_summaries) * 100 if enhanced_summaries else 0
 
         return {

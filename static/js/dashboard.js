@@ -814,21 +814,69 @@ function sortProgressTable(column) {
 }
 
 function filterByAthlete() {
-    const athleteFilter = document.getElementById('athleteFilterProgress')?.value;
+    const athleteFilter = document.getElementById('athlete_filter')?.value;
 
+    // Update athlete progress table
     if (!athleteFilter || athleteFilter === 'all') {
         currentProgressData = [...originalProgressData];
         populateProgressTable(currentProgressData);
         updateChartsForAthlete('all');
+        filterTrainingSummary('all');
         return;
     }
 
+    // Filter progress data
     currentProgressData = originalProgressData.filter(athlete => 
         athlete.id == athleteFilter
     );
 
     populateProgressTable(currentProgressData);
     updateChartsForAthlete(athleteFilter);
+    filterTrainingSummary(athleteFilter);
+}
+
+function filterTrainingSummary(athleteId) {
+    const summaryRows = document.querySelectorAll('#summaryTableBody tr');
+    summaryRows.forEach(row => {
+        const rowAthleteId = row.getAttribute('data-athlete-id');
+        if (!athleteId || athleteId === 'all' || rowAthleteId === athleteId) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function updateChartsForAthlete(athleteId) {
+    console.log('Updating charts for athlete:', athleteId);
+    
+    // Fetch chart data with athlete filter
+    const params = new URLSearchParams();
+    if (athleteId && athleteId !== 'all') {
+        params.append('athlete_id', athleteId);
+    }
+    
+    fetch(`/api/athlete-performance-charts?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateChartsWithData(data);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating charts:', error);
+        });
+}
+
+function updateChartsWithData(data) {
+    if (window.charts) {
+        Object.keys(window.charts).forEach(chartType => {
+            if (data[chartType] && window.charts[chartType]) {
+                window.charts[chartType].data = data[chartType];
+                window.charts[chartType].update();
+            }
+        });
+    }
 }
 
 // Populate Athlete Progress Table

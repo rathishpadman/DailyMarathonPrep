@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy import and_, func
 from models import Athlete, Activity, PlannedWorkout, DailySummary
@@ -182,7 +182,7 @@ class DataProcessor:
         try:
             # Update last sync time in Strava API usage
             self._update_last_sync_time()
-            
+
             # FIX: Ensure we're working with date objects consistently
             summary_date = performance_summary['summary_date']
             if isinstance(summary_date, datetime):
@@ -208,7 +208,7 @@ class DataProcessor:
                 existing_summary.pace_variance_percent = performance_summary.get('pace_variance_percent', 0)
                 existing_summary.status = performance_summary.get('status', 'Unknown')
                 existing_summary.notes = f"Activities: {', '.join(performance_summary.get('activity_names', []))}"
-                
+
                 # Always update with current data, including today's activities
                 if hasattr(existing_summary, 'updated_at'):
                     existing_summary.updated_at = current_timestamp
@@ -324,7 +324,7 @@ class DataProcessor:
         """Remove duplicate planned workouts, keeping the most recent one"""
         try:
             from sqlalchemy import func
-            
+
             # Find all duplicate groups
             duplicates_query = db.session.query(
                 PlannedWorkout.athlete_id,
@@ -336,26 +336,26 @@ class DataProcessor:
             ).having(func.count(PlannedWorkout.id) > 1).all()
 
             total_removed = 0
-            
+
             for dup in duplicates_query:
                 # Get all records for this athlete/date combination
                 duplicate_records = db.session.query(PlannedWorkout).filter(
                     PlannedWorkout.athlete_id == dup.athlete_id,
                     func.date(PlannedWorkout.workout_date) == dup.workout_date
                 ).order_by(PlannedWorkout.id.desc()).all()
-                
+
                 if len(duplicate_records) > 1:
                     # Keep the first one (highest ID), delete the rest
                     for record in duplicate_records[1:]:
                         db.session.delete(record)
                         total_removed += 1
-            
+
             if total_removed > 0:
                 db.session.commit()
                 logger.info(f"Removed {total_removed} duplicate planned workouts")
-            
+
             return total_removed
-            
+
         except Exception as e:
             logger.error(f"Failed to cleanup duplicate workouts: {e}")
             db.session.rollback()
@@ -414,7 +414,7 @@ class DataProcessor:
             return "0.0 km"
 
         return f"{distance_km:.1f} km"
-    
+
     def _update_last_sync_time(self):
         """Update the last sync time in Strava API usage tracking"""
         try:
@@ -422,24 +422,106 @@ class DataProcessor:
             from app import db
             from datetime import datetime
             import pytz
-            
+
             # Use IST timezone for consistency
             ist = pytz.timezone('Asia/Kolkata')
             now_ist = datetime.now(ist)
             today = now_ist.date()
-            
+
             usage = db.session.query(StravaApiUsage).filter_by(date=today).first()
-            
+
             if not usage:
                 usage = StravaApiUsage(date=today)
                 db.session.add(usage)
-            
+
             usage.last_sync_time = now_ist.replace(tzinfo=None)  # Store as naive datetime
             usage.updated_at = now_ist.replace(tzinfo=None)
             db.session.commit()
-            
+
             logger.info(f"Updated last sync time to {now_ist.strftime('%Y-%m-%d %H:%M:%S IST')}")
-            
+
         except Exception as e:
             logger.error(f"Error updating last sync time: {e}")
             # Don't raise exception as this is not critical
+
+    def save_daily_summary(self, performance_summary: Dict) -> bool:
+        """Save daily performance summary to database"""
+        try:
+            # Update last sync time in Strava API usage
+            self._update_last_sync_time()
+
+            # FIX: Ensure we're working with date objects consistently
+            summary_date = performance_summary['summary_date']
+            if isinstance(summary_date, datetime):
+                summary_date = summary_date.date()
+
+            athlete_id = performance_summary['athlete_id']
+
+            # Save or update daily summary with better duplicate handling
+            try:
+                # Use merge-like operation to handle duplicates
+                existing_summary = db.session.query(DailySummary).filter(
+                    DailySummary.athlete_id == athlete_id,
+                    db.func.date(DailySummary.summary_date) == summary_date
+                ).first()
+
+                if existing_summary:
+                    # Update existing summary
+                    existing_summary.actual_distance_km = performance_summary.get('actual_distance_km', 0)
+                    existing_summary.planned_distance_km = performance_summary.get('planned_distance_km', 0)
+                    existing_summary.actual_pace_min_per_km = performance_summary.get('actual_pace_min_per_km', 0)
+                    existing_summary.planned_pace_min_per_km = performance_summary.get('planned_pace_min_per_km', 0)
+                    existing_summary.distance_variance_percent = performance_summary.get('distance_variance_percent', 0)
+                    existing_summary.pace_variance_percent = performance_summary.get('pace_variance_percent', 0)
+                    existing_summary.status = performance_summary.get('status', 'Unknown')
+                    existing_summary.notes = f"Activities: {', '.join(performance_summary.get('activity_names', []))}"
+
+                else:
+                    # Create new summary with proper date handling
+                    daily_summary = DailySummary(
+                        athlete_id=athlete_id,
+                        summary_date=datetime.combine(summary_date, datetime.min.time()) if isinstance(summary_date, date) else summary_date,
+                        actual_distance_km=performance_summary.get('actual_distance_km', 0),
+                        planned_distance_km=performance_summary.get('planned_distance_km', 0),
+                        actual_pace_min_per_km=performance_summary.get('actual_pace_min_per_km', 0),
+                        planned_pace_min_per_km=performance_summary.get('planned_pace_min_per_km', 0),
+                        distance_variance_percent=performance_summary.get('distance_variance_percent', 0),
+                        pace_variance_percent=performance_summary.get('pace_variance_percent', 0),
+                        status=performance_summary.get('status', 'Unknown'),
+                        notes=f"Activities: {', '.join(performance_summary.get('activity_names', []))}"
+                    )
+
+                    try:
+                        db.session.add(daily_summary)
+                        db.session.flush()  # Check for constraint violations before commit
+                        logger.info(f"Created new daily summary for athlete {athlete_id} on {summary_date}")
+                    except Exception as constraint_error:
+                        logger.warning(f"Daily summary already exists for athlete {athlete_id} on {summary_date}, updating instead")
+                        db.session.rollback()
+                        # Try to find and update the existing record
+                        existing_summary = db.session.query(DailySummary).filter(
+                            DailySummary.athlete_id == athlete_id,
+                            db.func.date(DailySummary.summary_date) == summary_date
+                        ).first()
+                        if existing_summary:
+                            existing_summary.actual_distance_km = performance_summary.get('actual_distance_km', 0)
+                            existing_summary.planned_distance_km = performance_summary.get('planned_distance_km', 0)
+                            existing_summary.actual_pace_min_per_km = performance_summary.get('actual_pace_min_per_km', 0)
+                            existing_summary.planned_pace_min_per_km = performance_summary.get('planned_pace_min_per_km', 0)
+                            existing_summary.distance_variance_percent = performance_summary.get('distance_variance_percent', 0)
+                            existing_summary.pace_variance_percent = performance_summary.get('pace_variance_percent', 0)
+                            existing_summary.status = performance_summary.get('status', 'Unknown')
+                            existing_summary.notes = f"Activities: {', '.join(performance_summary.get('activity_names', []))}"
+
+                db.session.commit()
+                logger.info(f"Successfully saved daily summary for athlete {athlete_id} - includes today's data")
+                return True
+
+            except Exception as e:
+                logger.error(f"Failed to save daily summary for athlete {performance_summary.get('athlete_id')}: {e}")
+                db.session.rollback()
+                return False
+        except Exception as e:
+            logger.error(f"Failed to save daily summary for athlete {performance_summary.get('athlete_id')}: {e}")
+            db.session.rollback()
+            return False

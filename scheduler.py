@@ -1,7 +1,7 @@
 import schedule
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from threading import Thread
 from typing import Optional
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -145,58 +145,65 @@ class DailyTaskScheduler:
             return False
 
     def _update_planned_workouts(self, training_df) -> bool:
-        """Update planned workouts in database from training plan"""
+        """Update planned workouts from training plan data with strict duplicate prevention"""
         try:
             updated_count = 0
             created_count = 0
 
             for _, row in training_df.iterrows():
                 try:
+                    # Get athlete by name
                     athlete = Athlete.query.filter_by(name=row['AthleteName']).first()
                     if not athlete:
                         logger.warning(f"Athlete not found: {row['AthleteName']}")
                         continue
 
-                    # Validate required fields
-                    if not row.get('Date') or not row.get('PlannedDistanceKM'):
-                        logger.warning(f"Missing required fields for workout: {row}")
-                        continue
-
+                    # Convert date to ensure consistent format
                     workout_date = row['Date'].date() if hasattr(row['Date'], 'date') else row['Date']
 
-                    # Check if workout already exists
-                    existing_workout = PlannedWorkout.query.filter_by(
-                        athlete_id=athlete.id,
-                        workout_date=workout_date
+                    # Check for existing workout with multiple conditions
+                    existing_workout = PlannedWorkout.query.filter(
+                        PlannedWorkout.athlete_id == athlete.id,
+                        db.func.date(PlannedWorkout.workout_date) == workout_date
                     ).first()
 
                     if existing_workout:
-                        # Update existing workout
-                        existing_workout.planned_distance_km = row.get('PlannedDistanceKM', 0)
-                        existing_workout.planned_pace_min_per_km = row.get('PlannedPaceMinPerKM')
-                        existing_workout.workout_type = row.get('WorkoutType', 'General')
-                        existing_workout.notes = row.get('Notes', '')
-                        updated_count += 1
+                        # Only update if values are different
+                        if (existing_workout.planned_distance_km != row.get('PlannedDistanceKM', 0) or
+                            existing_workout.planned_pace_min_per_km != row.get('PlannedPaceMinPerKM') or
+                            existing_workout.workout_type != row.get('WorkoutType', 'General')):
+
+                            existing_workout.planned_distance_km = row.get('PlannedDistanceKM', 0)
+                            existing_workout.planned_pace_min_per_km = row.get('PlannedPaceMinPerKM')
+                            existing_workout.workout_type = row.get('WorkoutType', 'General')
+                            existing_workout.notes = row.get('Notes', '')
+                            updated_count += 1
+                            logger.debug(f"Updated planned workout for {athlete.name} on {workout_date}")
                     else:
-                        # Create new workout
-                        new_workout = PlannedWorkout(
-                            athlete_id=athlete.id,
-                            workout_date=workout_date,
-                            planned_distance_km=row.get('PlannedDistanceKM', 0),
-                            planned_pace_min_per_km=row.get('PlannedPaceMinPerKM'),
-                            workout_type=row.get('WorkoutType', 'General'),
-                            notes=row.get('Notes', '')
-                        )
-                        db.session.add(new_workout)
-                        created_count += 1
+                        # Create new workout only if it doesn't exist
+                        try:
+                            workout = PlannedWorkout(
+                                athlete_id=athlete.id,
+                                workout_date=datetime.combine(workout_date, datetime.min.time()) if isinstance(workout_date, date) else workout_date,
+                                planned_distance_km=row.get('PlannedDistanceKM', 0),
+                                planned_pace_min_per_km=row.get('PlannedPaceMinPerKM'),
+                                workout_type=row.get('WorkoutType', 'General'),
+                                notes=row.get('Notes', '')
+                            )
+                            db.session.add(workout)
+                            created_count += 1
+                            logger.debug(f"Created new planned workout for {athlete.name} on {workout_date}")
+                        except Exception as e:
+                            logger.warning(f"Duplicate workout prevented for {athlete.name} on {workout_date}: {e}")
+                            continue
 
                 except Exception as e:
-                    logger.error(f"Failed to process workout row {row}: {e}")
+                    logger.error(f"Failed to process workout for {row.get('AthleteName', 'Unknown')}: {e}")
                     continue
 
-            # Commit all changes
+            # Commit changes
             db.session.commit()
-            logger.info(f"Planned workouts updated: {updated_count} updated, {created_count} created")
+            logger.info(f"Successfully processed planned workouts: {created_count} created, {updated_count} updated")
             return True
 
         except Exception as e:

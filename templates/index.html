@@ -183,11 +183,11 @@
                                         <span class="badge bg-primary">{{ athlete_data.total_actual_km }} km</span>
                                     </td>
                                     <td class="period-data">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <small><strong>Current:</strong> {{ athlete_data.current_week_actual }}/{{ athlete_data.current_week_planned }} km</small>
-                                            <small><strong>Previous:</strong> {{ athlete_data.prev_week_actual }}/{{ athlete_data.prev_week_planned }} km</small>
+                                        <div class="mb-1">
+                                            <small class="d-block"><strong>Current:</strong> {{ athlete_data.current_week_actual }}/{{ athlete_data.current_week_planned }} km</small>
+                                            <small class="d-block"><strong>Previous:</strong> {{ athlete_data.prev_week_actual }}/{{ athlete_data.prev_week_planned }} km</small>
                                         </div>
-                                        <div class="progress mt-1" style="height: 4px;">
+                                        <div class="progress mb-1" style="height: 6px;">
                                             <div class="progress-bar 
                                                 {% if athlete_data.week_change >= 0 %}bg-success{% else %}bg-danger{% endif %}" 
                                                 role="progressbar" 
@@ -195,7 +195,7 @@
                                                 title="{{ athlete_data.week_change }} km change ({{ athlete_data.week_change_percent }}%)">
                                             </div>
                                         </div>
-                                        <small class="text-muted">
+                                        <small class="text-muted d-block">
                                             {% if athlete_data.week_change >= 0 %}+{% endif %}{{ athlete_data.week_change }} km 
                                             ({% if athlete_data.week_change_percent >= 0 %}+{% endif %}{{ athlete_data.week_change_percent }}%)
                                         </small>

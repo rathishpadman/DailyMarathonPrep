@@ -55,6 +55,31 @@ canvas {
     max-height: 300px !important;
 }
 
+/* Weekly Progress Bar Fixes */
+.period-data {
+    min-height: 80px;
+    position: relative;
+}
+
+.period-data .progress {
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+    height: 6px !important;
+    background-color: #e9ecef;
+}
+
+.period-data small {
+    display: block;
+    line-height: 1.2;
+    font-size: 0.8em;
+    margin-bottom: 2px;
+}
+
+.period-data .d-flex {
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
 /* Clickable athlete names */
 .clickable-athlete {
     transition: all 0.2s ease;

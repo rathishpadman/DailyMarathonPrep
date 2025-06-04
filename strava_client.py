@@ -91,6 +91,7 @@ class StravaClient:
                 'refresh_token': refresh_token,
                 'grant_type': 'refresh_token'
             }
+            print(payload)
 
             response = requests.post(self.TOKEN_URL, data=payload)
             response.raise_for_status()

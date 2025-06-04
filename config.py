@@ -11,7 +11,7 @@ class Config:
     STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
     STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
     # Use the actual Replit URL for redirect
-    STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI', 'https://60ba6287-de17-4565-8d0c-1562652f12dd-00-7wtsca7077xw.picard.replit.dev/auth/strava/callback')
+    STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI', 'https://25b83a14-7dfe-4d3d-a2fc-f0f0769b93de-00-1n2lwj7jincbm.pike.replit.dev/auth/strava/callback')
 
     # WhatsApp Business API Configuration
     WHATSAPP_API_URL = os.getenv("WHATSAPP_API_URL")

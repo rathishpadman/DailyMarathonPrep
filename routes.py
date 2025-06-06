@@ -1597,6 +1597,9 @@ def log_sync_operation(sync_type, start_date, end_date, athlete_id, success, det
 def api_training_summary(period):
     """API endpoint for training summary with period filtering"""
     try:
+        # Get athlete filter from query parameters
+        athlete_id = request.args.get('athlete_id', type=int)
+        
         if period == 'week':
             # Get current week data
             today = datetime.now().date()
@@ -1604,11 +1607,11 @@ def api_training_summary(period):
             week_start = today - timedelta(days=days_since_monday)
             week_end = week_start + timedelta(days=6)
             
-            summaries = db.session.query(DailySummary).join(Athlete).filter(
+            query = db.session.query(DailySummary).join(Athlete).filter(
                 DailySummary.summary_date >= week_start,
                 DailySummary.summary_date <= week_end,
                 Athlete.is_active == True
-            ).order_by(DailySummary.summary_date.desc(), Athlete.name).all()
+            )
             
         elif period == 'month':
             # Get current month data
@@ -1617,21 +1620,27 @@ def api_training_summary(period):
             next_month = month_start.replace(month=month_start.month + 1) if month_start.month < 12 else month_start.replace(year=month_start.year + 1, month=1)
             month_end = next_month - timedelta(days=1)
             
-            summaries = db.session.query(DailySummary).join(Athlete).filter(
+            query = db.session.query(DailySummary).join(Athlete).filter(
                 DailySummary.summary_date >= month_start,
                 DailySummary.summary_date <= month_end,
                 Athlete.is_active == True
-            ).order_by(DailySummary.summary_date.desc(), Athlete.name).all()
+            )
             
         else:  # 10days (default)
             end_date = datetime.now()
             start_date = end_date - timedelta(days=10)
             
-            summaries = db.session.query(DailySummary).join(Athlete).filter(
+            query = db.session.query(DailySummary).join(Athlete).filter(
                 DailySummary.summary_date >= start_date.date(),
                 DailySummary.summary_date <= end_date.date(),
                 Athlete.is_active == True
-            ).order_by(DailySummary.summary_date.desc(), Athlete.name).all()
+            )
+        
+        # Apply athlete filter if specified
+        if athlete_id:
+            query = query.filter(DailySummary.athlete_id == athlete_id)
+            
+        summaries = query.order_by(DailySummary.summary_date.desc(), Athlete.name).all()
 
         # Create individual rows for each athlete-date combination
         result_data = []

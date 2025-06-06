@@ -57,27 +57,68 @@ canvas {
 
 /* Weekly Progress Bar Fixes */
 .period-data {
-    min-height: 80px;
+    min-height: 100px;
     position: relative;
+    padding: 8px;
+    overflow: hidden;
 }
 
 .period-data .progress {
-    margin-top: 5px !important;
-    margin-bottom: 5px !important;
-    height: 6px !important;
+    margin-top: 8px !important;
+    margin-bottom: 8px !important;
+    height: 8px !important;
     background-color: #e9ecef;
+    border-radius: 4px;
+    clear: both;
 }
 
 .period-data small {
     display: block;
-    line-height: 1.2;
-    font-size: 0.8em;
-    margin-bottom: 2px;
+    line-height: 1.3;
+    font-size: 0.75em;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .period-data .d-flex {
-    flex-wrap: wrap;
-    gap: 5px;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 5px;
+}
+
+.period-data .mb-1 {
+    margin-bottom: 5px !important;
+}
+
+/* Weekly Progress Chart Container */
+.weekly-progress-container {
+    height: 60px;
+    margin: 10px 0;
+    position: relative;
+}
+
+.weekly-progress-chart {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #e9ecef 0%, #e9ecef 100%);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.weekly-progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.8em;
 }
 
 /* Clickable athlete names */

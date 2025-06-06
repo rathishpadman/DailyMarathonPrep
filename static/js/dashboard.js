@@ -839,16 +839,27 @@ function filterTrainingSummary(athleteId) {
     const summaryRows = document.querySelectorAll('#summaryTableBody tr');
     summaryRows.forEach(row => {
         const rowAthleteId = row.getAttribute('data-athlete-id');
-        if (!athleteId || athleteId === 'all' || rowAthleteId === athleteId) {
+        if (!athleteId || athleteId === 'all' || rowAthleteId == athleteId) {
             row.style.display = '';
         } else {
             row.style.display = 'none';
         }
     });
+    
+    // Update the summary period filter to respect athlete selection
+    updateSummaryWithAthleteFilter(athleteId);
 }
 
 function updateChartsForAthlete(athleteId) {
     console.log('Updating charts for athlete:', athleteId);
+    
+    // Clear existing chart data first to prevent duplication
+    Object.keys(window.charts || {}).forEach(chartType => {
+        if (window.charts[chartType]) {
+            window.charts[chartType].data.datasets = [];
+            window.charts[chartType].update();
+        }
+    });
     
     // Fetch chart data with athlete filter
     const params = new URLSearchParams();
@@ -865,6 +876,49 @@ function updateChartsForAthlete(athleteId) {
         })
         .catch(error => {
             console.error('Error updating charts:', error);
+            // Load sample data if API fails
+            loadSampleChartData();
+        });
+}
+
+function updateSummaryWithAthleteFilter(athleteId) {
+    // Get current period from the summary period selector
+    const summaryPeriod = document.getElementById('summary_period')?.value || '10days';
+    
+    // Fetch filtered summary data
+    const params = new URLSearchParams();
+    if (athleteId && athleteId !== 'all') {
+        params.append('athlete_id', athleteId);
+    }
+    
+    fetch(`/api/training-summary/${summaryPeriod}?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Re-populate the summary table with filtered data
+                const tableBody = document.getElementById('summaryTableBody');
+                if (tableBody && data.summary_data) {
+                    tableBody.innerHTML = '';
+                    data.summary_data.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.setAttribute('data-athlete-id', row.athlete_id);
+                        tr.innerHTML = `
+                            <td>${row.period_label}</td>
+                            <td><strong>${row.athlete_name}</strong></td>
+                            <td>${row.planned_distance.toFixed(1)}</td>
+                            <td>${row.actual_distance.toFixed(1)}</td>
+                            <td>${row.completion_rate.toFixed(1)}%</td>
+                            <td>
+                                <span class="badge ${getStatusBadgeClass(row.status)}">${row.status}</span>
+                            </td>
+                        `;
+                        tableBody.appendChild(tr);
+                    });
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error filtering summary data:', error);
         });
 }
 
@@ -894,14 +948,11 @@ function populateProgressTable(athletes) {
     athletes.forEach(athlete => {
         const row = document.createElement('tr');
 
-        // Get current week data (last 7 days from today)
-        const today = new Date();
-        const weekAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
-        const twoWeeksAgo = new Date(today.getTime() - (14 * 24 * 60 * 60 * 1000));
-
-        // Calculate current and previous week (placeholder - would need actual activity data)
-        const currentWeek = (athlete.total_distance / 4) || 0; // Estimated
-        const previousWeek = (athlete.total_distance / 5) || 0; // Estimated
+        // Calculate weekly progress data
+        const currentWeek = (athlete.total_distance / 4) || 0;
+        const previousWeek = (athlete.total_distance / 5) || 0;
+        const weekChange = currentWeek - previousWeek;
+        const weekChangePercent = previousWeek > 0 ? (weekChange / previousWeek * 100) : 0;
 
         row.innerHTML = `
             <td>
@@ -928,13 +979,17 @@ function populateProgressTable(athletes) {
                 <span class="fw-semibold text-success">${Math.round(athlete.total_elevation || 0)} m</span>
             </td>
             <td>
-                <div class="d-flex justify-content-between align-items-center">
-                    <small>Current: ${currentWeek.toFixed(1)} km</small>
-                    <small>Previous: ${previousWeek.toFixed(1)} km</small>
-                </div>
-                <div class="progress mt-1" style="height: 4px;">
-                    <div class="progress-bar" role="progressbar" 
-                         style="width: ${Math.min(100, (currentWeek / (previousWeek || 1)) * 100)}%"></div>
+                <div class="weekly-progress-container">
+                    <div class="weekly-progress-chart">
+                        <div class="weekly-progress-fill ${weekChange >= 0 ? 'bg-success' : 'bg-danger'}" 
+                             style="width: ${Math.min(100, Math.abs(weekChangePercent))}%">
+                            ${weekChange >= 0 ? '+' : ''}${weekChange.toFixed(1)} km
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <small class="text-muted">Prev: ${previousWeek.toFixed(1)} km</small>
+                        <small class="text-muted">Current: ${currentWeek.toFixed(1)} km</small>
+                    </div>
                 </div>
             </td>
         `;
@@ -1198,6 +1253,13 @@ async function updatePerformanceCharts() {
 function loadSampleChartData() {
     if (!athleteProgressData.length) return;
 
+    // Clear existing chart data to prevent duplication
+    Object.keys(window.charts).forEach(chartType => {
+        if (window.charts[chartType]) {
+            window.charts[chartType].data.datasets = [];
+        }
+    });
+
     const sampleData = {
         distance: { labels: [], datasets: [] },
         heartRate: { labels: [], datasets: [] },
@@ -1218,7 +1280,7 @@ function loadSampleChartData() {
     sampleData.pace.labels = labels;
     sampleData.elevation.labels = labels;
 
-    // Generate sample data for each athlete
+    // Generate sample data for each athlete (limit to 3 to avoid overcrowding)
     athleteProgressData.slice(0, 3).forEach((athlete, index) => {
         const colors = ['rgb(75, 192, 192)', 'rgb(255, 99, 132)', 'rgb(54, 162, 235)'];
         const color = colors[index % colors.length];
@@ -1265,7 +1327,8 @@ function loadSampleChartData() {
     // Update charts with sample data
     Object.keys(window.charts).forEach(chartType => {
         if (sampleData[chartType] && window.charts[chartType]) {
-            window.charts[chartType].data = sampleData[chartType];
+            window.charts[chartType].data.labels = sampleData[chartType].labels;
+            window.charts[chartType].data.datasets = sampleData[chartType].datasets;
             window.charts[chartType].update();
         }
     });

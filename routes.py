@@ -722,17 +722,14 @@ def api_athlete_progress_data():
                 if activity.total_elevation_gain:
                     total_elevation += activity.total_elevation_gain
 
-            # Generate some variance in data if no real data exists
-            athlete_seed = hash(athlete.name) % 1000
-
             progress_data.append({
                 'id': athlete.id,
                 'name': athlete.name,
-                'total_distance': round(total_distance, 1) if total_distance > 0 else round(50 + (athlete_seed % 30), 1),
-                'avg_pace': round(avg_pace / pace_count, 1) if pace_count > 0 else round(4.5 + (athlete_seed % 20) * 0.1, 1),
-                'avg_heart_rate': round(total_heart_rate / hr_count) if hr_count > 0 else round(150 + (athlete_seed % 30)),
-                'total_elevation': round(total_elevation) if total_elevation > 0 else round(300 + (athlete_seed % 500)),
-                'activity_count': len(recent_activities) if recent_activities else (5 + athlete_seed % 10)
+                'total_distance': round(total_distance, 1) if total_distance > 0 else 0,
+                'avg_pace': round(avg_pace / pace_count, 1) if pace_count > 0 else 0,
+                'avg_heart_rate': round(total_heart_rate / hr_count) if hr_count > 0 else 0,
+                'total_elevation': round(total_elevation) if total_elevation > 0 else 0,
+                'activity_count': len(recent_activities)
             })
 
         return jsonify({

@@ -817,11 +817,12 @@ function filterByAthlete() {
     const athleteFilter = document.getElementById('athlete_filter')?.value;
 
     // Update athlete progress table
-    if (!athleteFilter || athleteFilter === 'all') {
+    if (!athleteFilter || athleteFilter === 'all' || athleteFilter === '') {
         currentProgressData = [...originalProgressData];
         populateProgressTable(currentProgressData);
         updateChartsForAthlete('all');
         filterTrainingSummary('all');
+        updateSummaryWithAthleteFilter('all');
         return;
     }
 
@@ -833,6 +834,7 @@ function filterByAthlete() {
     populateProgressTable(currentProgressData);
     updateChartsForAthlete(athleteFilter);
     filterTrainingSummary(athleteFilter);
+    updateSummaryWithAthleteFilter(athleteFilter);
 }
 
 function filterTrainingSummary(athleteId) {
@@ -854,16 +856,18 @@ function updateChartsForAthlete(athleteId) {
     console.log('Updating charts for athlete:', athleteId);
     
     // Clear existing chart data first to prevent duplication
-    Object.keys(window.charts || {}).forEach(chartType => {
-        if (window.charts[chartType]) {
-            window.charts[chartType].data.datasets = [];
-            window.charts[chartType].update();
-        }
-    });
+    if (window.charts) {
+        Object.keys(window.charts).forEach(chartType => {
+            if (window.charts[chartType] && window.charts[chartType].data) {
+                window.charts[chartType].data.datasets = [];
+                window.charts[chartType].update();
+            }
+        });
+    }
     
     // Fetch chart data with athlete filter
     const params = new URLSearchParams();
-    if (athleteId && athleteId !== 'all') {
+    if (athleteId && athleteId !== 'all' && athleteId !== '') {
         params.append('athlete_id', athleteId);
     }
     
@@ -872,12 +876,12 @@ function updateChartsForAthlete(athleteId) {
         .then(data => {
             if (data.success) {
                 updateChartsWithData(data);
+            } else {
+                console.error('Chart API error:', data.message);
             }
         })
         .catch(error => {
             console.error('Error updating charts:', error);
-            // Load sample data if API fails
-            loadSampleChartData();
         });
 }
 
@@ -887,7 +891,7 @@ function updateSummaryWithAthleteFilter(athleteId) {
     
     // Fetch filtered summary data
     const params = new URLSearchParams();
-    if (athleteId && athleteId !== 'all') {
+    if (athleteId && athleteId !== 'all' && athleteId !== '') {
         params.append('athlete_id', athleteId);
     }
     
@@ -905,8 +909,8 @@ function updateSummaryWithAthleteFilter(athleteId) {
                         tr.innerHTML = `
                             <td>${row.period_label}</td>
                             <td><strong>${row.athlete_name}</strong></td>
-                            <td>${row.planned_distance.toFixed(1)}</td>
-                            <td>${row.actual_distance.toFixed(1)}</td>
+                            <td>${row.planned_distance.toFixed(1)} km</td>
+                            <td>${row.actual_distance.toFixed(1)} km</td>
                             <td>${row.completion_rate.toFixed(1)}%</td>
                             <td>
                                 <span class="badge ${getStatusBadgeClass(row.status)}">${row.status}</span>
@@ -915,6 +919,8 @@ function updateSummaryWithAthleteFilter(athleteId) {
                         tableBody.appendChild(tr);
                     });
                 }
+            } else {
+                console.error('Training summary API error:', data.error || data.message);
             }
         })
         .catch(error => {
@@ -973,10 +979,16 @@ function populateProgressTable(athletes) {
                 <span class="fw-semibold">${(athlete.avg_pace || 0).toFixed(1)} min/km</span>
             </td>
             <td>
-                <span class="fw-semibold text-danger">${Math.round(athlete.avg_heart_rate || 0)} bpm</span>
+                ${athlete.avg_heart_rate && athlete.avg_heart_rate > 0 ? 
+                    `<span class="fw-semibold text-danger">${Math.round(athlete.avg_heart_rate)} bpm</span>` : 
+                    '<span class="text-muted">No data</span>'
+                }
             </td>
             <td>
-                <span class="fw-semibold text-success">${Math.round(athlete.total_elevation || 0)} m</span>
+                ${athlete.total_elevation && athlete.total_elevation > 0 ? 
+                    `<span class="fw-semibold text-success">${Math.round(athlete.total_elevation)} m</span>` : 
+                    '<span class="text-muted">No data</span>'
+                }
             </td>
             <td>
                 <div class="weekly-progress-container">

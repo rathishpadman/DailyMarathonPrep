@@ -852,6 +852,49 @@ function filterTrainingSummary(athleteId) {
     updateSummaryWithAthleteFilter(athleteId);
 }
 
+function filterTrainingSummaryByAthlete() {
+    const athleteId = document.getElementById('summary_athlete_filter')?.value;
+    const period = document.getElementById('summary_period')?.value || '10days';
+    
+    // Fetch filtered summary data
+    const params = new URLSearchParams();
+    if (athleteId && athleteId !== '') {
+        params.append('athlete_id', athleteId);
+    }
+    
+    fetch(`/api/training-summary/${period}?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Re-populate the summary table with filtered data
+                const tableBody = document.getElementById('summaryTableBody');
+                if (tableBody && data.summary_data) {
+                    tableBody.innerHTML = '';
+                    data.summary_data.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.setAttribute('data-athlete-id', row.athlete_id);
+                        tr.innerHTML = `
+                            <td>${row.period_label}</td>
+                            <td><strong>${row.athlete_name}</strong></td>
+                            <td>${row.planned_distance.toFixed(1)} km</td>
+                            <td>${row.actual_distance.toFixed(1)} km</td>
+                            <td>${row.completion_rate.toFixed(1)}%</td>
+                            <td>
+                                <span class="badge ${getStatusBadgeClass(row.status)}">${row.status}</span>
+                            </td>
+                        `;
+                        tableBody.appendChild(tr);
+                    });
+                }
+            } else {
+                console.error('Training summary API error:', data.error || data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error filtering summary data:', error);
+        });
+}
+
 function updateChartsForAthlete(athleteId) {
     console.log('Updating charts for athlete:', athleteId);
     
@@ -1436,9 +1479,28 @@ function updateSummaryPeriod() {
 
 function updateChartsTimeframe() {
     const timeframe = document.getElementById('chart_timeframe')?.value || '7days';
+    const athleteId = document.getElementById('chart_athlete_filter')?.value;
     console.log('Updating charts timeframe:', timeframe);
-    // Reload charts with new timeframe
-    updatePerformanceCharts();
+    
+    // Update charts with new timeframe and current athlete filter
+    const params = new URLSearchParams();
+    if (athleteId && athleteId !== '') {
+        params.append('athlete_id', athleteId);
+    }
+    params.append('timeframe', timeframe);
+    
+    fetch(`/api/athlete-performance-charts?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateChartsWithData(data);
+            } else {
+                console.error('Chart API error:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating charts:', error);
+        });
 }
 
 function resetAllFilters() {

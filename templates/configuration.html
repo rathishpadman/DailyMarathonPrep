@@ -89,33 +89,7 @@
                 </div>
             </div>
 
-            <!-- Athlete Performance Charts -->
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i data-feather="bar-chart-2" class="me-2"></i>
-                        Athlete Performance Charts
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <canvas id="distanceChart" width="400" height="200"></canvas>
-                        </div>
-                        <div class="col-md-6">
-                            <canvas id="heartRateChart" width="400" height="200"></canvas>
-                        </div>
-                    </div>
-                    <div class="row mt-4">
-                        <div class="col-md-6">
-                            <canvas id="paceChart" width="400" height="200"></canvas>
-                        </div>
-                        <div class="col-md-6">
-                            <canvas id="elevationChart" width="400" height="200"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            
         </div>
     </div>
 </div>
@@ -125,7 +99,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     loadAthletes();
     loadOptimalValues();
-    initializeCharts();
 
     document.getElementById('optimalValuesForm').addEventListener('submit', saveOptimalValues);
     document.getElementById('config_athlete_id').addEventListener('change', loadOptimalValues);
@@ -193,7 +166,6 @@ async function saveOptimalValues(e) {
 
         if (data.success) {
             showAlert('success', 'Configuration saved successfully!');
-            updateCharts();
         } else {
             showAlert('error', 'Failed to save configuration: ' + data.message);
         }
@@ -202,73 +174,7 @@ async function saveOptimalValues(e) {
     }
 }
 
-function initializeCharts() {
-    // Initialize empty charts
-    const ctx1 = document.getElementById('distanceChart').getContext('2d');
-    const ctx2 = document.getElementById('heartRateChart').getContext('2d');
-    const ctx3 = document.getElementById('paceChart').getContext('2d');
-    const ctx4 = document.getElementById('elevationChart').getContext('2d');
 
-    window.charts = {};
-
-    window.charts.distance = new Chart(ctx1, {
-        type: 'line',
-        data: { labels: [], datasets: [] },
-        options: { 
-            responsive: true,
-            plugins: { title: { display: true, text: 'Distance vs Optimal' } }
-        }
-    });
-
-    window.charts.heartRate = new Chart(ctx2, {
-        type: 'line',
-        data: { labels: [], datasets: [] },
-        options: { 
-            responsive: true,
-            plugins: { title: { display: true, text: 'Heart Rate vs Optimal' } }
-        }
-    });
-
-    window.charts.pace = new Chart(ctx3, {
-        type: 'line',
-        data: { labels: [], datasets: [] },
-        options: { 
-            responsive: true,
-            plugins: { title: { display: true, text: 'Pace vs Optimal' } }
-        }
-    });
-
-    window.charts.elevation = new Chart(ctx4, {
-        type: 'bar',
-        data: { labels: [], datasets: [] },
-        options: { 
-            responsive: true,
-            plugins: { title: { display: true, text: 'Elevation vs Optimal' } }
-        }
-    });
-
-    updateCharts();
-}
-
-async function updateCharts() {
-    // Fetch athlete performance data and update charts
-    try {
-        const response = await fetch('/api/athlete-performance-charts');
-        const data = await response.json();
-
-        if (data.success) {
-            // Update each chart with actual vs optimal data
-            Object.keys(window.charts).forEach(chartType => {
-                if (data[chartType]) {
-                    window.charts[chartType].data = data[chartType];
-                    window.charts[chartType].update();
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error updating charts:', error);
-    }
-}
 
 function showAlert(type, message) {
     const alert = document.createElement('div');

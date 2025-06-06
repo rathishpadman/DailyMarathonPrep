@@ -31,11 +31,23 @@ def index():
 
         # Monthly stats (last 30 days) - only count activities from active athletes  
         month_ago = datetime.now() - timedelta(days=30)
-        monthly_activities = db.session.query(func.count(distinct(Activity.id))).join(Athlete).filter(
+        
+        # Get unique activities per day to avoid counting duplicates
+        monthly_activities_raw = db.session.query(Activity).join(Athlete).filter(
             Activity.start_date >= month_ago,
             Activity.start_date <= datetime.now(),
             Athlete.is_active == True
-        ).scalar() or 0
+        ).all()
+        
+        # Remove duplicates by creating unique key per athlete per day
+        unique_monthly_activities = {}
+        for activity in monthly_activities_raw:
+            activity_date = activity.start_date.date()
+            key = f"{activity.athlete_id}_{activity_date}"
+            if key not in unique_monthly_activities:
+                unique_monthly_activities[key] = activity
+        
+        monthly_activities = len(unique_monthly_activities)
 
         # Total planned vs actual distance this week - use consistent data source
         # First, get planned workouts for the week
